@@ -1,4 +1,5 @@
 # net/net_mobilenet.py
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -174,39 +175,6 @@ class MobileNetV2(nn.Module):
         return x
 
 
-
-class ResidualDepthwiseSeparable(nn.Module):
-    '''带残差连接的深度可分离卷积块'''
-
-    def __init__(self, inp, oup, stride):
-        super(ResidualDepthwiseSeparable, self).__init__()
-        self.stride = stride
-        self.use_res_connect = stride == 1 and inp == oup
-
-        self.depthwise = nn.Sequential(
-            nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
-            nn.BatchNorm2d(inp),
-            nn.ReLU6(inplace=True)
-        )
-
-        self.pointwise = nn.Sequential(
-            nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
-            nn.BatchNorm2d(oup),
-            nn.ReLU6(inplace=True)
-        )
-
-    def forward(self, x):
-        if self.use_res_connect:
-            identity = x
-            x = self.depthwise(x)
-            x = self.pointwise(x)
-            return x + identity  # 残差连接
-        else:
-            x = self.depthwise(x)
-            x = self.pointwise(x)
-            return x
-
-
 class LightNet(nn.Module):
     """轻量残差 MobileNetV1 特征提取器"""
     def __init__(self, in_channels, width_multiplier=1.0):
@@ -220,6 +188,37 @@ class LightNet(nn.Module):
                 nn.BatchNorm2d(oup),
                 nn.ReLU6(inplace=True)
             )
+
+        class ResidualDepthwiseSeparable(nn.Module):
+            '''带残差连接的深度可分离卷积块'''
+
+            def __init__(self, inp, oup, stride):
+                super(ResidualDepthwiseSeparable, self).__init__()
+                self.stride = stride
+                self.use_res_connect = stride == 1 and inp == oup
+
+                self.depthwise = nn.Sequential(
+                    nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
+                    nn.BatchNorm2d(inp),
+                    nn.ReLU6(inplace=True)
+                )
+
+                self.pointwise = nn.Sequential(
+                    nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+                    nn.BatchNorm2d(oup),
+                    nn.ReLU6(inplace=True)
+                )
+
+            def forward(self, x):
+                if self.use_res_connect:
+                    identity = x
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x + identity  # 残差连接
+                else:
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x
 
         # 根据宽度乘数调整通道数
         output_channels = int(32 * width_multiplier)
@@ -257,7 +256,6 @@ class LightNet(nn.Module):
         x = self.flatten(x)
         x = F.normalize(self.fc(x), p=2.0, dim=1)  # L2 正则化
         return x
-
 
 def mobilenet(version, in_channels, width_multiplier=1.0):
     """返回 MobileNet 对象"""

@@ -106,6 +106,13 @@ class TimeFrequencyTransformer:
             # plt.tight_layout()
             # plt.show()
 
+            # """只打印独立频谱图"""
+            # plt.figure(figsize=(8, 6))
+            # plt.imshow(chan_ind_spec_amp, aspect="auto", origin='lower')
+            # plt.axis('off')
+            # plt.tight_layout(pad=0)  # 移除边距
+            # plt.savefig('paper/figures/spec.png', dpi=600, bbox_inches='tight', pad_inches=0)  # 或 .svg
+            # plt.show()
             return chan_ind_spec_amp
 
         # Normalize the IQ samples.

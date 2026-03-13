@@ -50,10 +50,13 @@ DATASET_FILES = {
 }
 
 # 模型文件路径
-def get_model_path(pps_for, net_type, filename=""):
+def get_model_path(preprocess_type, net_type, filename="", wst_j=None, wst_q=None):
     """获取模型路径"""
-    return ROOT_MODEL_DIR / pps_for / net_type / filename
-
+    if wst_j is not None and wst_q is not None:
+        return ROOT_MODEL_DIR / f'preprocess_type.value_j{wst_j}q{wst_q}' / net_type.value / filename
+    else:
+        return ROOT_MODEL_DIR / preprocess_type.value / net_type.value / filename
+# 数据集文件路径
 def get_dataset_path(key):
     """获取数据集路径的辅助函数"""
     if key in DATASET_FILES:

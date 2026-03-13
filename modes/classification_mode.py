@@ -33,7 +33,6 @@ def test_classification(
     test_list:list =None,
     snr_range=None,
     model_dir=None,
-    pps_for=None,
     is_pac=True,
     enable_plots=True,
 ):
@@ -51,7 +50,6 @@ def test_classification(
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
     :param model_dir: 模型目录路径
-    :param pps_for: 预处理类型名称
     :param is_pac: 是否使用PAC降维
     :param enable_plots: 控制是否绘制混淆矩阵（默认为True）
     """
@@ -158,7 +156,7 @@ def test_classification(
 
                 # K-NN和SVM的初步预测
                 if is_pac:
-                    # SVM 投影到 PCA, 按道理说KNN不需要
+                    # SVM和KNN 投影到 PCA
                     feature_clf_pca = pca.transform(feature_clf[0])
                     pred_label_svm_wo = svmclf.predict(feature_clf_pca)
                     pred_label_knn_wo = knnclf.predict(feature_clf_pca)
@@ -241,7 +239,7 @@ def test_classification(
             if enable_plots:
                 # 确保保存目录存在
                 os.makedirs(confusion_save_dir, exist_ok=True)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, pps_for, vote_size, confusion_save_dir)
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, preprocess_type, vote_size, confusion_save_dir)
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)

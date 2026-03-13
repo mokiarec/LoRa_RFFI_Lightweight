@@ -68,6 +68,8 @@ def collect_all_models_statistics():
         NetworkType.RESNET,
         NetworkType.MobileNetV1,
         NetworkType.MobileNetV2,
+        NetworkType.MobileNetV3,
+        NetworkType.MobileNetV4,
         NetworkType.LightNet,
         NetworkType.DRSN
     ]

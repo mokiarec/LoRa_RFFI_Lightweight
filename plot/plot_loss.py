@@ -24,9 +24,8 @@ def plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_s
 
     # 添加标题和图例
     net_name = net_type.value
-    pps_for = preprocess_type.value
     plt.title(
-        f"Loss of {num_epochs} Epoch, Net: {net_name}, Convert Type: {pps_for}"
+        f"Loss of {num_epochs} Epoch, Net: {net_name}, Convert Type: {preprocess_type.value}"
     )
     fig.legend(
         loc="upper right",

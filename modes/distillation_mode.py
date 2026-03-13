@@ -20,6 +20,7 @@ from training_utils.data_preprocessor import generate_spectrogram
 
 
 def distillation(
+    mode,
     data,
     labels,
     teacher_model_path,
@@ -32,13 +33,14 @@ def distillation(
     student_net_type=None,
     preprocess_type=None,
     test_list=None,
-    model_dir_path=None,
+    model_dir=None,
     is_pca=True,
     pca_file_path=None,
 ):
     """
     使用知识蒸馏训练轻量级模型
 
+    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param data: 输入数据
     :param labels: 输入数据的标签
     :param teacher_model_path: 教师模型路径
@@ -51,10 +53,12 @@ def distillation(
     :param student_net_type: 学生网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
-    :param model_dir_path: 模型保存路径
+    :param model_dir: 模型保存路径
     :param is_pca: 是否使用PCA降维处理特征（默认为True）
     :param pca_file_path: PCA文件路径
     """
+
+    model_dir = os.path.join(model_dir, mode)
 
     if is_pca:
         # 加载 PCA
@@ -198,18 +202,17 @@ def distillation(
             # 保存训练好的模型
             if test_list and (epoch + 1) in test_list:
                 # 创建文件夹&文件
-                if not os.path.exists(model_dir_path):
-                    os.makedirs(model_dir_path)
-                file_name = f"Extractor_{epoch + 1}.pth"
+                if not os.path.exists(model_dir):
+                    os.makedirs(model_dir)
 
                 # 保存模型到指定路径
-                file_path = os.path.join(model_dir_path, file_name)
-                torch.save(student_model.state_dict(), file_path)
-                tqdm.write(f"Distilled model saved to {file_path}")
+                model_path = os.path.join(model_dir, f"Extractor_{epoch + 1}.pth")
+                torch.save(student_model.state_dict(), model_path)
+                tqdm.write(f"Distilled model saved to {model_path}")
 
                 # 绘制loss折线图
                 if test_list and (epoch + 1) in test_list[-3:]:
-                    pic_save_path = model_dir_path + f"loss_{epoch+1}.png"
+                    pic_save_path = os.path.join(model_dir, f"loss_{epoch+1}.png")
                     plot_loss_curve(loss_per_epoch, num_epochs, student_net_type, preprocess_type, pic_save_path)
 
             # 更新总进度条

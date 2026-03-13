@@ -6,7 +6,7 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.config import Config, Mode
+from core.config import Config, Mode, NetworkType, DistillateMode
 from modes.classification_mode import test_classification
 from paths import DATASET_FILES, get_model_path
 
@@ -83,8 +83,14 @@ test_datasets = [
 ]
 
 def run_multi_dataset_eval():
-    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.PRUNE, Mode.DISTILLATION
-    config = Config(Mode.CLASSIFICATION)
+    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.DISTILLATION
+    config = Config(Mode.CLASSIFICATION,
+         net_type=NetworkType.RESNET,
+         teacher_net_type=NetworkType.RESNET,
+         student_net_type=NetworkType.MobileNetV1,
+         distillate_mode=DistillateMode.ONLY_TEST,
+         test_list=[200],
+         is_pca_test=False)
 
     results = []
 
@@ -94,7 +100,7 @@ def run_multi_dataset_eval():
         # 根据数据集名称决定使用的注册集文件
         if "SEEN" in name.upper():
             enrol_cfg = dict(
-                file_path_enrol=str(DATASET_FILES['train_aug']),
+                file_path_enrol=str(DATASET_FILES['train_no_aug']),
                 dev_range_enrol=np.arange(0, 40, dtype=int),
                 pkt_range_enrol=np.arange(0, 200, dtype=int),
             )
@@ -110,24 +116,35 @@ def run_multi_dataset_eval():
             file_path_clf=path,
             dev_range_clf=dev_range,
             pkt_range_clf=pkt_range,
-            net_type=config.NET_TYPE,
+            net_type=config.NET_TYPE if config.mode == Mode.CLASSIFICATION else config.STUDENT_NET_TYPE,
             preprocess_type=config.PREPROCESS_TYPE,
             test_list=config.TEST_LIST,
-            model_dir=get_model_path(config.PPS_FOR, config.NET_TYPE.value),
-            pps_for=config.PPS_FOR,
+            model_dir=config.ORIGIN_MODEL_DIR_PATH if config.mode == Mode.CLASSIFICATION else config.STUDENT_MODEL_DIR,
             is_pac=config.IS_PCA_TEST,
             **enrol_cfg
         )
 
-        results.append((name, acc["combined"] * 100, note))
+        results.append({
+            'name': name,
+            'knn_wo': acc["knn_wo"] * 100,
+            'svm_wo': acc["svm_wo"] * 100,
+            'knn_w': acc["knn_w"] * 100,
+            'svm_w': acc["svm_w"] * 100,
+            'combined': acc["combined"] * 100,
+            'note': note
+        })
 
     # ========= 打印汇总表 =========
     print("\n\n================ Summary =================")
-    print(f"{'Dataset':35s} | {'Acc (%)':>8s} | Notes")
-    print("-" * 70)
-    for name, acc, note in results:
-        print(f"{name:35s} | {acc:8.2f} | {note}")
-    print("=" * 70)
+    print(
+        f"{'Dataset':35s} | {'KNN wo/v':>8s} | {'SVM wo/v':>8s} | {'KNN w/v':>8s} | {'SVM w/v':>8s} | {'Combined':>8s} | Notes")
+    print("-" * 100)
+    for result in results:
+        print(f"{result['name']:35s} | {result['knn_wo']:8.2f} | {result['svm_wo']:8.2f} | "
+              f"{result['knn_w']:8.2f} | {result['svm_w']:8.2f} | {result['combined']:8.2f} | {result['note']}")
+    print("=" * 100)
+
+
 
 
 if __name__ == "__main__":

@@ -73,30 +73,31 @@ class Config:
         self.IS_PCA_TRAIN = kwargs.get('is_pca_train', True)    # 训练时
         self.IS_PCA_TEST = kwargs.get('is_pca_test', True)      # 测试时
         # 我们需要一个新的训练文件吗？
-        self.new_file_flag = True
+        self.new_file_flag = kwargs.get('new_file_flag', True)
 
         # CHECKPOINT列表
-        # self.TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
-        self.TEST_LIST = [200]
+        self.TEST_LIST = kwargs.get('test_list', [1, 5, 10, 20, 50, 100, 150, 200, 250, 300])
+        # self.TEST_LIST = kwargs.get('test_list', [200])
 
-        self.WST_J = 6
-        self.WST_Q = 6
-
-
-        # 生成模型路径设置
-        self.PPS_FOR = "stft" if self.PREPROCESS_TYPE == PreprocessType.STFT else "wst"
-
-        if self.PREPROCESS_TYPE == PreprocessType.STFT:
-            self.MODEL_DIR= get_model_path(self.PPS_FOR, self.NET_TYPE)
-            self.TEACHER_MODEL_DIR = get_model_path(self.PPS_FOR, self.TEACHER_NET_TYPE)
-            self.STUDENT_MODEL_DIR = get_model_path(self.PPS_FOR, self.STUDENT_NET_TYPE)
-            self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
+        # WST参数
+        if self.PREPROCESS_TYPE == PreprocessType.WST:
+            self.WST_J = kwargs.get('wst_j', 6)
+            self.WST_Q = kwargs.get('wst_q', 6)
         else:
-            self.ORIGIN_MODEL_DIR_PATH = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE}/"
-            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.TEACHER_NET_TYPE.value}/"
-            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.STUDENT_NET_TYPE.value}/"
-            self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
+            self.WST_J = None
+            self.WST_Q = None
 
+
+        # 生成模型路径
+        self.ORIGIN_MODEL_DIR_PATH = get_model_path(self.PREPROCESS_TYPE, self.NET_TYPE, wst_j=self.WST_J, wst_q=self.WST_Q)
+        self.TEACHER_MODEL_DIR = get_model_path(self.PREPROCESS_TYPE, self.TEACHER_NET_TYPE, wst_j=self.WST_J, wst_q=self.WST_Q)
+        self.STUDENT_MODEL_DIR = get_model_path(self.PREPROCESS_TYPE, self.STUDENT_NET_TYPE, wst_j=self.WST_J, wst_q=self.WST_Q)
+
+        # 新生成数据集文件路径
+        if self.PREPROCESS_TYPE == PreprocessType.STFT:
+            self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}.h5"
+        elif self.PREPROCESS_TYPE == PreprocessType.WST:
+            self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}_j{self.WST_J}q{self.WST_Q}.h5"
 
         # PCA相关的路径
         self.PCA_DATA_DIR = os.path.join(self.TEACHER_MODEL_DIR, "pca_results")
@@ -108,7 +109,7 @@ class Config:
 
     def _ensure_directories(self):
         """确保模型目录存在"""
-        directories = [self.MODEL_DIR, self.TEACHER_MODEL_DIR, self.STUDENT_MODEL_DIR, self.PCA_DATA_DIR]
+        directories = [self.ORIGIN_MODEL_DIR_PATH, self.TEACHER_MODEL_DIR, self.STUDENT_MODEL_DIR, self.PCA_DATA_DIR]
 
         for directory in directories:
             os.makedirs(directory, exist_ok=True)

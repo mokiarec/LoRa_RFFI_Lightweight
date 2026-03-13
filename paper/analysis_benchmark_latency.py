@@ -65,7 +65,7 @@ def run_latency_benchmark(num_runs=10, **kwargs):
 
 # --- 使用示例 ---
 if __name__ == "__main__":
-    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.PRUNE, Mode.DISTILLATION
+    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.DISTILLATION
     config = Config(Mode.CLASSIFICATION)
 
     # 配置测试参数
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         "net_type": config.NET_TYPE,
         "preprocess_type": config.PREPROCESS_TYPE,
         "test_list": config.TEST_LIST,
-        "model_dir": get_model_path(config.PPS_FOR, config.NET_TYPE.value),
+        "model_dir": get_model_path(config.PREPROCESS_TYPE, config.NET_TYPE),
         "is_pac": config.IS_PCA_TEST,
     }
 

@@ -19,6 +19,100 @@ MOBILITY_ROBUSTNESS_PLOT_PATH = PAPER_OUTPUT_FILES['mobility_robustness']
 ACCURACY_HEATMAP_PLOT_PATH = PAPER_OUTPUT_FILES['accuracy_heatmap']
 DETAILED_ACCURACY_HEATMAP_PLOT_PATH = PAPER_OUTPUT_FILES['detailed_accuracy_heatmap']
 
+# 联合滑动投票测试结果
+# experiments = {
+#     "ResNet18 (Teacher) + w/o PCA": {
+#         "Seen": 99.33,
+#         "LOS": [95.00, 95.00, 90.00],       # A, B, C
+#         "NLOS": [90.50, 80.50, 90.50],      # D, E, F
+#         "Walk": [96.50, 91.50],             # B_walk, F_walk
+#         "Mobile": [96.0, 97.5],             # Office, Meeting
+#         "Antenna": [89.50, 82.00],          # B, F
+#     },
+#
+#     "MobileNetV2 (No KD) + w/o PCA": {
+#         "Seen": 71.00,
+#         "LOS": [86.00, 81.50, 78.00],
+#         "NLOS": [84.00, 67.50, 90.00],
+#         "Walk": [83.50, 89.50],
+#         "Mobile": [77.00, 81.00],
+#         "Antenna": [86.50, 85.50]
+#     },
+#
+#     "MobileNetV1 (No KD) + w/o PCA": {
+#         "Seen": 61.00,
+#         "LOS": [90.50, 73.00, 79.00],
+#         "NLOS": [88.00, 69.50, 86.00],
+#         "Walk": [75.50, 77.00],
+#         "Mobile": [71.50, 85.50],
+#         "Antenna": [88.00, 94.50],
+#     },
+#
+#     "MobileNetV1 (No KD) + w/  PCA": {
+#         "Seen": 72.33,
+#         "LOS": [88.00, 76.00, 84.00],
+#         "NLOS": [89.00, 68.50, 88.50],
+#         "Walk": [78.50, 84.00],
+#         "Mobile": [75.50, 87.00],
+#         "Antenna": [87.50, 95.00],
+#     },
+#
+#     "MobileNetV1 (PCA KD) + w/o PCA": {
+#         "Seen": 97.67,
+#         "LOS": [100.00, 97.50, 91.00],
+#         "NLOS": [97.00, 91.00, 99.50],
+#         "Walk": [99.00, 98.00],
+#         "Mobile": [77.50, 81.00],
+#         "Antenna": [91.00, 85.00],
+#     },
+#
+#     "MobileNetV1 (PCA KD) + w/  PCA": {
+#         "Seen": 98.67,
+#         "LOS": [99.50, 99.00, 90.00],
+#         "NLOS": [94.50, 88.00, 100.00],
+#         "Walk": [97.50, 97.50],
+#         "Mobile": [75.00, 81.50],
+#         "Antenna": [91.00, 84.50],
+#     },
+#
+#     "LightNet (No KD) + w/o PCA": {
+#         "Seen": 97.67,
+#         "LOS": [99.50, 90.50, 90.00],
+#         "NLOS": [98.00, 68.00, 98.50],
+#         "Walk": [98.00, 94.50],
+#         "Mobile": [97.50, 99.00],
+#         "Antenna": [99.50, 92.50],
+#     },
+#
+#     "LightNet (No KD) + w/  PCA": {
+#         "Seen": 98.50,
+#         "LOS": [99.50, 90.00, 90.00],
+#         "NLOS": [98.00, 66.00, 99.00],
+#         "Walk": [97.50, 93.50],
+#         "Mobile": [97.50, 99.00],
+#         "Antenna": [100.0, 93.00],
+#     },
+#
+#     "LightNet (PCA KD) + w/o PCA": {
+#         "Seen": 99.00,
+#         "LOS": [100.0, 99.50, 100.0],
+#         "NLOS": [98.0, 90.50, 100.0],
+#         "Walk": [100.0, 100.0],
+#         "Mobile": [91.50, 94.50],
+#         "Antenna": [98.50, 91.00],
+#     },
+#
+#     "LightNet (PCA KD) + w/  PCA": {
+#         "Seen": 99.00,
+#         "LOS": [100.0, 99.50, 100.0],
+#         "NLOS": [98.0, 92.00, 100.0],
+#         "Walk": [100.0, 100.0],
+#         "Mobile": [94.50, 96.00],
+#         "Antenna": [99.50, 92.50],
+#     },
+# }
+
+# KNN w/o 测试结果
 experiments = {
     "ResNet18 (Teacher) + w/o PCA": {
         "Seen": 99.33,
@@ -27,15 +121,6 @@ experiments = {
         "Walk": [96.50, 91.50],             # B_walk, F_walk
         "Mobile": [96.0, 97.5],             # Office, Meeting
         "Antenna": [89.50, 82.00],          # B, F
-    },
-
-    "MobileNetV2 (No KD) + w/o PCA": {
-        "Seen": 71.00,
-        "LOS": [86.00, 81.50, 78.00],
-        "NLOS": [84.00, 67.50, 90.00],
-        "Walk": [83.50, 89.50],
-        "Mobile": [77.00, 81.00],
-        "Antenna": [86.50, 85.50]
     },
 
     "MobileNetV1 (No KD) + w/o PCA": {
@@ -110,6 +195,7 @@ experiments = {
         "Antenna": [99.50, 92.50],
     },
 }
+
 
 if __name__ == '__main__':
 
@@ -215,17 +301,17 @@ if __name__ == '__main__':
         ax = ax,
     )
 
-    # 为前三个模型策略添加统一红色边框（带间距）
-    padding = 0
-    rect = plt.Rectangle(
-        (-padding, -padding),
-        len(df.columns) + 2 * padding,
-        2 + 2 * padding,
-        fill=False,
-        edgecolor='red',
-        lw=2
-    )
-    ax.add_patch(rect)
+    # # 为前三个模型策略添加统一红色边框（带间距）
+    # padding = 0
+    # rect = plt.Rectangle(
+    #     (-padding, -padding),
+    #     len(df.columns) + 2 * padding,
+    #     2 + 2 * padding,
+    #     fill=False,
+    #     edgecolor='red',
+    #     lw=2
+    # )
+    # ax.add_patch(rect)
 
     # 3. 美化标签
     plt.title("Ablation Study: Accuracy Comparison Across Scenarios", fontsize=12, pad=15, fontweight='bold')

@@ -59,6 +59,8 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
 
     # 初始化模型和优化器
     model = TripletNet(net_type=net_type, in_channels=preprocess_type.in_channels)
+    model.load_state_dict(torch.load(os.path.join(model_dir, "Extractor_200.pth")), strict=False)
+
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
 
