@@ -57,9 +57,12 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
+    # 准备验证集数据 (转换为 tensor)
+    valid_data_tensor = torch.tensor(data_valid, dtype=torch.float32).to(DEVICE)
+    valid_labels_tensor = torch.tensor(labels_valid, dtype=torch.long).to(DEVICE)
+
     # 初始化模型和优化器
     model = TripletNet(net_type=net_type, in_channels=preprocess_type.in_channels)
-    model.load_state_dict(torch.load(os.path.join(model_dir, "Extractor_200.pth")), strict=False)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
@@ -76,6 +79,10 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
         "---------------------\n".format(num_epochs, batch_size, batch_num)
     )
     loss_per_epoch = []
+
+    # 追踪最佳模型
+    best_accuracy = 0.0
+    best_epoch = 0
 
     # 总进度条
     with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
@@ -118,6 +125,55 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
                 + f"Loss: {loss_ep:.6f}"
             )
 
+            # 验证集评估 (最近邻分类)
+            model.eval()
+            with torch.no_grad():
+                # 特征提取：获取验证集数据的 embedding
+                valid_embeddings = model.embedding_net(valid_data_tensor)
+
+                # 计算距离矩阵 (样本间欧氏距离)
+                distance_matrix = torch.cdist(valid_embeddings, valid_embeddings, p=2)
+
+                # 最近邻投票
+                n_neighbors = 5  # 可以调整为其他值，如 1, 3, 5 等
+
+                # 对于每个样本，找到距离最近的 N 个邻居 (不包括自己)
+                # 获取距离矩阵的排序索引 (按距离从小到大)
+                _, sorted_indices = torch.sort(distance_matrix, dim=1)
+
+                # 取前 N+1 个 (包含自己)，然后去掉自己，取 N 个邻居
+                k_indices = sorted_indices[:, 1:n_neighbors + 1]
+
+                # 获取邻居的标签
+                neighbor_labels = valid_labels_tensor[k_indices]
+
+                # 投票：统计每个标签的出现次数，选择最高频的标签
+                predicted_labels = torch.mode(neighbor_labels, dim=1)[0]
+
+                # 计算准确率
+                accuracy = (predicted_labels == valid_labels_tensor).float().mean().item() * 100
+
+            model.train()
+
+            # 输出验证结果
+            text += f", Val Acc@{n_neighbors}NN: {accuracy:.2f}%"
+
+            # 保存最佳模型
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_epoch = epoch + 1
+                text += f" ⭐ Best"
+
+                # 保存最佳模型到指定路径
+                if not os.path.exists(model_dir):
+                    os.makedirs(model_dir)
+                best_file_path = os.path.join(model_dir, "Extractor_best.pth")
+                torch.save(model.state_dict(), best_file_path)
+                tqdm.write(f"Best model saved to {best_file_path} (Acc: {accuracy:.2f}%)")
+
+            # 更新总进度条
+            total_bar.update(1)
+
             tqdm.write(text)
             loss_per_epoch.append(loss_ep)
 
@@ -138,7 +194,13 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
                     pic_save_path = os.path.join(model_dir, f"loss_{epoch+1}.png")
                     plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_save_path)
 
-            # 更新总进度条
-            total_bar.update(1)
+
+    # 打印最佳模型信息
+    print(f"\n{'=' * 50}")
+    print(f"训练完成！最佳模型信息:")
+    print(f"  - Epoch: {best_epoch}")
+    print(f"  - 验证集准确率：{best_accuracy:.2f}%")
+    print(f"  - 保存路径：{os.path.join(model_dir, 'Extractor_best.pth')}")
+    print(f"{'=' * 50}\n")
 
     return model
