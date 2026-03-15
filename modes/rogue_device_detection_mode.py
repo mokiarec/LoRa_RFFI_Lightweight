@@ -6,12 +6,13 @@ import torch
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
-from core.config import Mode, PCA_DIM_TEST
+from core.config import Config, Mode
 from plot.plot_roc import evaluate_and_plot_roc
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 
 def test_rogue_device_detection(
+    config: Config,
     mode: str = None,
     file_path_enrol: str=None,
     dev_range_enrol: np.array=None,
@@ -132,7 +133,7 @@ def test_rogue_device_detection(
             knnclf = KNeighborsClassifier(n_neighbors=15, metric="euclidean")
 
             if is_pac:
-                pca = PCA(n_components=PCA_DIM_TEST)
+                pca = PCA(n_components=config.PCA_DIM_TEST)
                 pca.fit(feature_enrol[0])  # 只用 enrollment 特征
                 feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
                 knnclf.fit(feature_enrol_pca, label_enrol.ravel())

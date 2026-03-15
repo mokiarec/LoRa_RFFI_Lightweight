@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
-from core.config import Mode, PCA_DIM_TEST  # Config枚举型
+from core.config import Config  # Config枚举型
 from plot.plot_confusion import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 # 工具包
@@ -21,25 +21,21 @@ from utils.better_print import TextAnimator
 
 
 def test_classification(
-    mode=None,
+    config: Config,
     file_path_enrol: str=None,
     file_path_clf: str=None,
     dev_range_enrol: np.array=None,
     dev_range_clf: np.array=None,
     pkt_range_enrol: np.array=None,
     pkt_range_clf: np.array=None,
-    net_type=None,
-    preprocess_type=None,
-    test_list:list =None,
     snr_range=None,
-    model_dir=None,
     is_pac=True,
     enable_plots=True,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
 
-    :param mode: 模式，用于确定子目录名称及模型保存路径。
+    :param model_dir: 模型目录路径
     :param file_path_enrol (str): 注册数据集的文件路径。
     :param file_path_clf (str): 分类数据集的文件路径。
     :param dev_range_enrol: 注册数据集中设备的范围。
@@ -49,21 +45,21 @@ def test_classification(
     :param net_type: 网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
-    :param model_dir: 模型目录路径
     :param is_pac: 是否使用PAC降维
     :param enable_plots: 控制是否绘制混淆矩阵（默认为True）
     """
 
-    # 子目录路径
-    if mode == Mode.CLASSIFICATION:
-        mode = 'origin'
+    try:
+        import swanlab
+        SWANLAB_AVAILABLE = True
+    except ImportError:
+        SWANLAB_AVAILABLE = False
 
     # 加载数据
 
     vote_size = 10
     weight_knn = 0.5
     weight_svm = 1 - weight_knn
-
 
     """
     提取设备特征
@@ -73,31 +69,45 @@ def test_classification(
     print("\nData loading...")
     label_enrol, triplet_data_enrol = load_generate_triplet(
         file_path_enrol, dev_range_enrol, pkt_range_enrol,
-        preprocess_type, snr_range=snr_range
+        config.PREPROCESS_TYPE, snr_range=snr_range
     )
 
     # 加载分类数据集(IQ样本和标签)
     label_clf, triplet_data_clf = load_generate_triplet(
         file_path_clf, dev_range_clf, pkt_range_clf,
-        preprocess_type, snr_range=snr_range
+        config.PREPROCESS_TYPE, snr_range=snr_range
     )
     print("\nData loaded!!!")
 
-    model_dir = os.path.join(model_dir, mode)
     print(f"PCA used!!" if is_pac else "PCA not used!!")
 
-    for epoch in test_list or []:
+    # 存储所有 epoch 的结果用于汇总
+    all_epoch_results = []
+
+
+    # 构建待测试的模型列表：包含 config.TEST_LIST 中的数字编号以及 'best_model'
+    test_epochs = (config.TEST_LIST or []) + ['best_model']
+
+    for epoch in test_epochs:
         print()
         print("=============================")
 
         # 保存路径
-        confusion_save_dir = os.path.join(model_dir, "cft")
-        model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
+        weights_dir = os.path.join(config.MODEL_DIR, "weights")
+        eval_dir = os.path.join(config.MODEL_DIR, "eval")
+        
+        # 根据 epoch 类型构建模型路径
+        if isinstance(epoch, int) or (isinstance(epoch, str) and epoch.isdigit()):
+            model_path = os.path.join(weights_dir, f"Extractor_{epoch}.pth")
+        elif epoch == 'best_model':
+            model_path = os.path.join(weights_dir, "Extractor_best.pth")
+        else:
+            model_path = os.path.join(weights_dir, f"Extractor_{epoch}.pth")
 
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, net_type, preprocess_type)
+            model = load_model(model_path, config.NET_TYPE, config.PREPROCESS_TYPE)
             print("Model loaded!!!")
 
             # 计算FLOPs和参数量
@@ -120,7 +130,7 @@ def test_classification(
                     plot_pca_scree(feats=feature_enrol[0], max_components=scree_max_components)
 
                 if is_pac:
-                    pca = PCA(n_components=PCA_DIM_TEST)
+                    pca = PCA(n_components=config.PCA_DIM_TEST)
                     pca.fit(feature_enrol[0])  # 只用 enrollment 特征
                     feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
 
@@ -238,12 +248,56 @@ def test_classification(
 
             if enable_plots:
                 # 确保保存目录存在
-                os.makedirs(confusion_save_dir, exist_ok=True)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, preprocess_type, vote_size, confusion_save_dir)
+                if not os.path.exists(model_path):
+                    os.makedirs(model_path)
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.NET_TYPE, config.PREPROCESS_TYPE, vote_size, eval_dir)
+
+            # 记录到 SwanLab
+            if SWANLAB_AVAILABLE:
+                # 记录准确率指标
+                swanlab.log({
+                    f"classification/epoch": epoch,
+                    f"classification/knn_wo_accuracy": wo_acc_knn * 100,
+                    f"classification/svm_wo_accuracy": wo_acc_svm * 100,
+                    f"classification/knn_w_accuracy": w_acc_knn * 100,
+                    f"classification/svm_w_accuracy": w_acc_svm * 100,
+                    f"classification/combined_accuracy": acc_combined * 100,
+                    f"classification/enrol_feature_time": enrol_feature_extraction_time,
+                    f"classification/clf_feature_time": clf_feature_extraction_time,
+                    f"classification/prediction_time": prediction_time,
+                }, step=epoch)
+
+                # 上传混淆矩阵图片
+                cm_path = os.path.join(eval_dir, f"clf_{epoch}.png")
+
+                if os.path.exists(cm_path):
+                    swanlab.log({
+                        f"classification/confusion_matrix": swanlab.Image(cm_path)
+                    }, step=epoch)
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
         print("=============================")
+
+        # 存储当前 epoch 的结果
+        all_epoch_results.append({
+            "epoch": epoch,
+            "knn_wo": wo_acc_knn,
+            "svm_wo": wo_acc_svm,
+            "knn_w": w_acc_knn,
+            "svm_w": w_acc_svm,
+            "combined": acc_combined,
+        })
+
+    # 记录汇总统计到 SwanLab
+    if SWANLAB_AVAILABLE and all_epoch_results:
+        # 记录最佳结果
+        best_result = max(all_epoch_results, key=lambda x: x["combined"])
+        swanlab.log({
+            "classification/best_epoch": best_result["epoch"],
+            "classification/best_combined_accuracy": best_result["combined"] * 100,
+            "classification/avg_combined_accuracy": np.mean([r["combined"] for r in all_epoch_results]) * 100,
+        })
 
     return {
         "knn_wo": wo_acc_knn,

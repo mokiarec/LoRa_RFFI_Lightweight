@@ -17,7 +17,7 @@ class TripletNet(nn.Module):
         ):
         super(TripletNet, self).__init__()
         self.margin = margin
-        if net_type == NetworkType.RESNET:
+        if net_type == NetworkType.ResNet:
             self.embedding_net = FeatureExtractor(in_channels=in_channels)
 
         elif net_type == NetworkType.DRSN:

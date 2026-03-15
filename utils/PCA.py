@@ -179,7 +179,7 @@ if __name__ == '__main__':
         batch_size=128,
         model_path="../model/stft/ResNet/origin/Extractor_200.pth",
         output_path="../model/stft/ResNet_no_aug/distilled/pca_results/teacher_feats_origintrain.npz",
-        teacher_net_type=NetworkType.RESNET,
+        teacher_net_type=NetworkType.ResNet,
         preprocess_type=PreprocessType.STFT
     )
 

@@ -1,28 +1,26 @@
 import numpy as np
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode, PCA_DIM_TRAIN, DistillateMode
+from core.config import Config, Mode, DistillateMode
 from modes.classification_mode import test_classification
 from modes.distillation_mode import distillation
 from modes.rogue_device_detection_mode import test_rogue_device_detection
 from modes.train_mode import train
-from paths import get_dataset_path, get_model_path
+from paths import get_dataset_path
 from training_utils.data_preprocessor import prepare_train_data
 from utils.PCA import pca_perform, pca_extract_features
 from utils.better_print import print_colored_text
 
 
-def main(mode=Mode.TRAIN, **kwargs):
+def main(config: Config):
     """主函数"""
-    config = Config(mode, **kwargs)
 
     # 打印网络类型
-    print(f"Running mode: {mode}")
-    if config.mode == Mode.DISTILLATION:
-        print(f"Teacher Net TYPE: {config.TEACHER_NET_TYPE}")
-        print(f"Student Net TYPE: {config.STUDENT_NET_TYPE}")
-    else:
-        print(f"Net TYPE: {config.NET_TYPE}")
+    print(f"Running mode: {config.mode}")
+    if hasattr(config, 'BASE_MODEL_DIR'):
+        print(f"Base Net TYPE: {config.BASE_NET_TYPE}")
+    if hasattr(config, 'EXP_NET_TYPE'):
+        print(f"Exp Net TYPE: {config.EXP_NET_TYPE}")
 
     # 使用字典映射替代 if-elif-else 结构
     mode_functions = {
@@ -33,10 +31,10 @@ def main(mode=Mode.TRAIN, **kwargs):
     }
 
     # 执行对应模式的函数
-    if mode in mode_functions:
-        mode_functions[mode](config)
+    if config.mode in mode_functions:
+        mode_functions[config.mode](config)
     else:
-        raise ValueError(f"Unknown mode: {mode}")
+        raise ValueError(f"Unknown mode: {config.mode}")
 
 
 def run_train_mode(config):
@@ -50,22 +48,17 @@ def run_train_mode(config):
         path_train_original_data=get_dataset_path('train_no_aug'),
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
-        snr_range=np.arange(20, 80),
+        # snr_range=np.arange(20, 80),
         generate_type=config.PREPROCESS_TYPE,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )
 
     # 训练特征提取模型
-    train(
-        config.mode,
-        data,
-        labels,
-        num_epochs=max(config.TEST_LIST),
-        net_type=config.NET_TYPE,
-        preprocess_type=config.PREPROCESS_TYPE,
-        test_list=config.TEST_LIST,
-        model_dir=config.ORIGIN_MODEL_DIR_PATH,
+    train(config, data, labels,
+          batch_size=config.HP['batch_size'],
+          num_epochs=config.HP['num_epochs'],
+          learning_rate=config.HP['learning_rate'],
     )
 
 
@@ -75,19 +68,14 @@ def run_classification_mode(config):
 
     # 执行分类任务
     test_classification(
-        config.mode,
+        config,
         file_path_enrol=get_dataset_path('train_aug'),
         file_path_clf=get_dataset_path('test_seen'),
         dev_range_enrol=np.arange(0, 40, dtype=int),
         pkt_range_enrol=np.arange(0, 400, dtype=int),
         dev_range_clf=np.arange(0, 40, dtype=int),
         pkt_range_clf=np.arange(0, 200, dtype=int),
-        net_type=config.NET_TYPE,
-        preprocess_type=config.PREPROCESS_TYPE,
-        test_list=config.TEST_LIST,
-        # snr_range=np.arange(20, 30),
-        model_dir=config.ORIGIN_MODEL_DIR_PATH,
-        is_pac = config.IS_PCA_TEST
+        is_pac=config.IS_PCA_TEST
     )
 
 
@@ -138,19 +126,16 @@ def run_distillation_mode(config):
 
             # 提取教师模型特征
             pca_extract_features(data, labels, batch_size=128,
-                             model_path=get_model_path(config.PREPROCESS_TYPE,
-                                                       config.TEACHER_NET_TYPE,
-                                                       "origin/Extractor_200.pth"
-                                            ),  # 默认使用第200轮的模型
+                             model_path=config.TEACHER_MODEL_PATH,
                              output_path=config.PCA_FILE_INPUT,
                              teacher_net_type=config.TEACHER_NET_TYPE,
                              preprocess_type=config.PREPROCESS_TYPE
                         )
-            # 执行PCA
+            # 执行 PCA
             pca_perform(
                 input_file=config.PCA_FILE_INPUT,
                 output_file=config.PCA_FILE_OUTPUT,
-                n_components=PCA_DIM_TRAIN
+                n_components=config.PCA_DIM_TRAIN
             )
 
         # 准备训练数据
@@ -171,10 +156,7 @@ def run_distillation_mode(config):
             config.mode,
             data,
             labels,
-            teacher_model_path=get_model_path(config.PREPROCESS_TYPE,
-                                              config.TEACHER_NET_TYPE,
-                                              "origin/Extractor_200.pth"
-                                            ),  # 默认使用第200轮的模型
+            teacher_model_path=config.TEACHER_MODEL_PATH,
             num_epochs=max(config.TEST_LIST),
             temperature=3.0,
             alpha=0.7,
@@ -193,8 +175,6 @@ def run_distillation_mode(config):
         # 执行分类测试
         test_classification(
             config.mode,
-            # file_path_enrol=get_dataset_path('train_aug'),
-            # file_path_clf=get_dataset_path('test_seen'),
             file_path_enrol="dataset/DATA_all_dev_1~11_499times_433m_1M_3gain.h5",
             file_path_clf="dataset/DATA_all_dev_1~11_499times_433m_1M_3gain.h5",
             dev_range_enrol=np.arange(0, 40, dtype=int),
@@ -204,7 +184,6 @@ def run_distillation_mode(config):
             net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PREPROCESS_TYPE,
             test_list=config.TEST_LIST,
-            # snr_range=np.arange(20, 30),
             model_dir=config.STUDENT_MODEL_DIR,
             is_pac=config.IS_PCA_TEST,
         )
@@ -230,5 +209,5 @@ def run_distillation_mode(config):
             model_dir=config.STUDENT_MODEL_DIR,
             wst_j=config.WST_J,
             wst_q=config.WST_Q,
-            is_pac = config.IS_PCA_TEST
+            is_pac=config.IS_PCA_TEST
         )
