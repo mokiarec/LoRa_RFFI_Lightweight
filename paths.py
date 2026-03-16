@@ -3,14 +3,10 @@ import re
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+from dataset import DATASET
+
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.absolute()
-
-# 数据集路径
-DATASET_DIR = PROJECT_ROOT / "dataset"
-TRAIN_DATASET_DIR = DATASET_DIR / "Train"
-TEST_DATASET_DIR = DATASET_DIR / "Test"
-CHANNEL_PROBLEM_DIR = TEST_DATASET_DIR / "channel_problem"
 
 # 检查点根目录 (新的统一目录结构)
 CHECKPOINTS_DIR = PROJECT_ROOT / "checkpoints"
@@ -21,36 +17,8 @@ PAPER_RESULTS_DIR = PAPER_DIR / "results"
 PAPER_FIGURES_DIR = PAPER_DIR / "figures"
 
 # 确保目录存在
-for directory in [DATASET_DIR, TRAIN_DATASET_DIR, TEST_DATASET_DIR,
-                  CHANNEL_PROBLEM_DIR, CHECKPOINTS_DIR,
-                  PAPER_DIR, PAPER_RESULTS_DIR, PAPER_FIGURES_DIR]:
+for directory in [CHECKPOINTS_DIR, PAPER_DIR, PAPER_RESULTS_DIR, PAPER_FIGURES_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
-
-
-# 数据集文件路径
-DATASET_FILES = {
-    # Training datasets
-    'train_no_aug': TRAIN_DATASET_DIR / "dataset_training_no_aug.h5",
-    'train_aug_0hz': TRAIN_DATASET_DIR / "dataset_training_aug_0hz.h5",
-    'train_aug': TRAIN_DATASET_DIR / "dataset_training_aug.h5",
-    # Test datasets
-    'test_seen': TEST_DATASET_DIR / "dataset_seen_devices.h5",
-    'test_rogue': TEST_DATASET_DIR / "dataset_rogue.h5",
-    'test_residential': TEST_DATASET_DIR / "dataset_residential.h5",
-    # Channel problem datasets
-    'A': CHANNEL_PROBLEM_DIR / "A.h5",
-    'B': CHANNEL_PROBLEM_DIR / "B.h5",
-    'C': CHANNEL_PROBLEM_DIR / "C.h5",
-    'D': CHANNEL_PROBLEM_DIR / "D.h5",
-    'E': CHANNEL_PROBLEM_DIR / "E.h5",
-    'F': CHANNEL_PROBLEM_DIR / "F.h5",
-    'B_walk': CHANNEL_PROBLEM_DIR / "B_walk.h5",
-    'F_walk': CHANNEL_PROBLEM_DIR / "F_walk.h5",
-    'moving_office': CHANNEL_PROBLEM_DIR / "moving_office.h5",
-    'moving_meeting_room': CHANNEL_PROBLEM_DIR / "moving_meeting_room.h5",
-    'B_antenna': CHANNEL_PROBLEM_DIR / "B_antenna.h5",
-    'F_antenna': CHANNEL_PROBLEM_DIR / "F_antenna.h5",
-}
 
 
 # ============================================================================
@@ -355,10 +323,10 @@ def get_experiment_dir(experiment_name):
         return CHECKPOINTS_DIR
 
 # 数据集文件路径
-def get_dataset_path(key):
+def get_dataset(key):
     """获取数据集路径的辅助函数"""
-    if key in DATASET_FILES:
-        return str(DATASET_FILES[key])
+    if key in DATASET:
+        return DATASET[key]
     raise ValueError(f"未知数据集：{key}")
 
 # 论文输出文件路径
