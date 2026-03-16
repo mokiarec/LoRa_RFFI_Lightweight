@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # --- 示例 1: 训练基础模型 (EXP_01) ---
     # config1 = Config(
     #     mode=Mode.TRAIN,
-    #     net_type=NetworkType.LightNet,
+    #     net_type=NetworkType.ResNet,
     #     exp_description="Base"
     # )
     # config1.save_to_json()
@@ -29,21 +29,23 @@ if __name__ == "__main__":
     # )
 
     # --- 示例 3: 知识蒸馏实验 (EXP_03) ---
-    # config3 = Config(
-    #     mode=Mode.DISTILLATION,
-    #     base_net_type=NetworkType.ResNet,
-    #     exp_net_type=NetworkType.LightNet,
-    #     exp_description="KD_PCA16",
-    #     base_version="01"  # 基于 EXP_01
-    # )
+    config3 = Config(
+        mode=Mode.DISTILLATION,
+        net_type=NetworkType.LightNet,
+        exp_description="KD_PCA16",
+        base_version="02",  # 基于 EXP_02
+        is_pca_train=True,
+    )
+    config3.save_to_json()
 
     # --- 示例 4: 分类实验 (EXP_01) ---
-    config4 = Config.from_json(
-        mode=Mode.CLASSIFICATION,
-        model_dir="./checkpoints/EXP_01_LightNet_Base"
-    )
+    # config4 = Config.from_json(
+    #     mode=Mode.CLASSIFICATION,
+    #     model_dir="./checkpoints/EXP_01_LightNet_Base"
+    # )
+    #
 
-    config = config4
+    config = config3
 
     try:
         import swanlab
@@ -56,12 +58,15 @@ if __name__ == "__main__":
     if SWANLAB_AVAILABLE:
         # 动态生成：例如 EXP_01_LightNet_Base_classification
         mode_name = config.mode.value if isinstance(config.mode, Mode) else str(config.mode)
-        current_exp_name = f"{config.EXP_NAME}_{mode_name}"
-        custom_logdir = os.path.join(config.MODEL_DIR, "swanlog", config.mode.value)
+        # current_exp_name = f"{config.EXP_NAME}_{mode_name}"
+        current_exp_name = f"{config.EXP_NAME}"
+        custom_logdir = os.path.join(config.MODEL_DIR, "swanlog")
         try:
             swanlab.init(
                 project="Lightweight_LoRa_RFFI",
                 experiment_name=current_exp_name,
+                # resume=True,
+                # id="39a2iyzzjqcoryia1liw1",
                 config={
                     "network_type": config.NET_TYPE.value,
                     "preprocess_type": config.PREPROCESS_TYPE.value,

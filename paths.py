@@ -345,11 +345,14 @@ def get_experiment_dir(experiment_name):
         >>> get_experiment_dir("EXP_01_KD_PCA16")
         checkpoints/experiments/EXP_01_KD_PCA16
     """
-    model_dir = CHECKPOINTS_DIR / experiment_name
-    weights_dir = model_dir / "weights"
-    eval_dir = model_dir / "eval"
+    if experiment_name is not None:
+        model_dir = CHECKPOINTS_DIR / experiment_name
+        weights_dir = model_dir / "weights"
+        eval_dir = model_dir / "eval"
 
-    return model_dir
+        return model_dir, weights_dir, eval_dir
+    else:
+        return CHECKPOINTS_DIR
 
 # 数据集文件路径
 def get_dataset_path(key):

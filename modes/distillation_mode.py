@@ -2,25 +2,26 @@
 """蒸馏模式相关函数"""
 import math
 import os
+import time
 
 import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import torch
-import torch.optim as optim
-import torch.nn.functional as F
-import time
 
+from core.config import Config
+from core.config import DEVICE
+from net.TripletNet import TripletNet
 from plot.plot_loss import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
-from net.TripletNet import TripletNet
-from core.config import DEVICE
 from training_utils.data_preprocessor import generate_spectrogram
 
 
 def distillation(
-    mode,
+    config: Config,
     data,
     labels,
     teacher_model_path,
@@ -29,11 +30,6 @@ def distillation(
     learning_rate=1e-3,
     temperature=3.0,
     alpha=0.7,
-    teacher_net_type=None,
-    student_net_type=None,
-    preprocess_type=None,
-    test_list=None,
-    model_dir=None,
     is_pca=True,
     pca_file_path=None,
 ):
@@ -49,16 +45,15 @@ def distillation(
     :param learning_rate: 学习率
     :param temperature: 蒸馏温度
     :param alpha: 蒸馏损失权重
-    :param teacher_net_type: 教师网络类型
-    :param student_net_type: 学生网络类型
-    :param preprocess_type: 预处理类型
-    :param test_list: 测试点列表
-    :param model_dir: 模型保存路径
     :param is_pca: 是否使用PCA降维处理特征（默认为True）
     :param pca_file_path: PCA文件路径
     """
 
-    model_dir = os.path.join(model_dir, mode)
+    try:
+        import swanlab
+        SWANLAB_AVAILABLE = True
+    except ImportError:
+        SWANLAB_AVAILABLE = False
 
     if is_pca:
         # 加载 PCA
@@ -80,13 +75,17 @@ def distillation(
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化教师模型
-    teacher_model = TripletNet(net_type=teacher_net_type, in_channels=preprocess_type.in_channels)  # RESNET
+    teacher_model = TripletNet(net_type=config.BASE_NET_TYPE, in_channels=config.PREPROCESS_TYPE.in_channels)  # RESNET
     teacher_model.load_state_dict(torch.load(teacher_model_path))
     teacher_model.to(DEVICE)
     teacher_model.eval()
 
+    # 准备验证集数据 (转换为 tensor)
+    valid_data_tensor = torch.tensor(data_valid, dtype=torch.float32).to(DEVICE)
+    valid_labels_tensor = torch.tensor(labels_valid, dtype=torch.long).to(DEVICE)
+
     # 初始化学生模型 (MobileNet)
-    student_model = TripletNet(net_type=student_net_type, in_channels=preprocess_type.in_channels)  # MobileNet
+    student_model = TripletNet(net_type=config.NET_TYPE, in_channels=config.PREPROCESS_TYPE.in_channels)  # MobileNet
     optimizer = optim.Adam(student_model.parameters(), lr=learning_rate)
     triplet_loss_fn = TripletLoss(margin=0.1)
 
@@ -106,6 +105,10 @@ def distillation(
         "---------------------\n".format(num_epochs, batch_size, batch_num, temperature, alpha, is_pca)
     )
     loss_per_epoch = []
+
+    # 追踪最佳模型
+    best_accuracy = 0.0
+    best_epoch = 0
 
     # 总进度条
     with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
@@ -199,24 +202,84 @@ def distillation(
             tqdm.write(text)
             loss_per_epoch.append(loss_ep)
 
-            # 保存训练好的模型
-            if test_list and (epoch + 1) in test_list:
-                # 创建文件夹&文件
-                if not os.path.exists(model_dir):
-                    os.makedirs(model_dir)
+            # 验证集评估 (最近邻分类)
+            student_model.eval()
+            with torch.no_grad():
+                # 特征提取：获取验证集数据的 embedding
+                valid_embeddings = student_model.embedding_net(valid_data_tensor)
 
-                # 保存模型到指定路径
-                model_path = os.path.join(model_dir, f"Extractor_{epoch + 1}.pth")
-                torch.save(student_model.state_dict(), model_path)
-                tqdm.write(f"Distilled model saved to {model_path}")
+                # 计算距离矩阵 (样本间欧氏距离)
+                distance_matrix = torch.cdist(valid_embeddings, valid_embeddings, p=2)
 
-                # 绘制loss折线图
-                if test_list and (epoch + 1) in test_list[-3:]:
-                    pic_save_path = os.path.join(model_dir, f"loss_{epoch+1}.png")
-                    plot_loss_curve(loss_per_epoch, num_epochs, student_net_type, preprocess_type, pic_save_path)
+                # 最近邻投票
+                n_neighbors = 5  # 可以调整为其他值，如 1, 3, 5 等
+
+                # 对于每个样本，找到距离最近的 N 个邻居 (不包括自己)
+                # 获取距离矩阵的排序索引 (按距离从小到大)
+                _, sorted_indices = torch.sort(distance_matrix, dim=1)
+
+                # 取前 N+1 个 (包含自己)，然后去掉自己，取 N 个邻居
+                k_indices = sorted_indices[:, 1:n_neighbors + 1]
+
+                # 获取邻居的标签
+                neighbor_labels = valid_labels_tensor[k_indices]
+
+                # 投票：统计每个标签的出现次数，选择最高频的标签
+                predicted_labels = torch.mode(neighbor_labels, dim=1)[0]
+
+                # 计算准确率
+                accuracy = (predicted_labels == valid_labels_tensor).float().mean().item() * 100
+
+            student_model.train()
+
+            # 输出验证结果
+            text += f", Val Acc@{n_neighbors}NN: {accuracy:.2f}%"
+
+            # 保存最佳模型
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_epoch = epoch + 1
+                text += f" ⭐ Best"
+
+                # 保存最佳模型到指定路径
+                best_file_path = os.path.join(config.MODEL_WEIGHTS_DIR, "Extractor_best.pth")
+                torch.save(student_model.state_dict(), best_file_path)
+                tqdm.write(f"Best model saved to {best_file_path} (Acc: {accuracy:.2f}%)")
 
             # 更新总进度条
             total_bar.update(1)
+
+            tqdm.write(text)
+            loss_per_epoch.append(loss_ep)
+
+            # 记录到 SwanLab
+            if SWANLAB_AVAILABLE:
+                swanlab.log({
+                    "train/loss_epoch": loss_ep,
+                    "train/val_accuracy": accuracy,
+                    "train/epoch_time": end_time_ep - start_time_ep,
+                }, step=epoch + 1)
+
+            # 保存训练好的模型
+            if config.TEST_LIST and (epoch + 1) in config.TEST_LIST:
+                # 保存模型到指定路径
+                file_name = f"Extractor_{epoch + 1}.pth"
+                file_path = os.path.join(config.MODEL_WEIGHTS_DIR, file_name)
+                torch.save(student_model.state_dict(), file_path)
+                tqdm.write(f"Distilled model saved to {file_path}")
+
+                # 绘制loss折线图
+                if config.TEST_LIST and (epoch + 1) in config.TEST_LIST[-3:]:
+                    pic_save_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"loss_{epoch+1}.png")
+                    plot_loss_curve(loss_per_epoch, num_epochs, config.NET_TYPE, config.PREPROCESS_TYPE, pic_save_path)
+
+    # 打印最佳模型信息
+    print(f"\n{'=' * 50}")
+    print(f"蒸馏训练完成！最佳模型信息:")
+    print(f"  - Epoch: {best_epoch}")
+    print(f"  - 验证集准确率：{best_accuracy:.2f}%")
+    print(f"  - 保存路径：{os.path.join(config.MODEL_WEIGHTS_DIR, 'Extractor_best.pth')}")
+    print(f"{'=' * 50}\n")
 
     return student_model
 

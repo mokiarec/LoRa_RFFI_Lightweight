@@ -11,6 +11,9 @@
 # 忽略所有数据文件
 *.yaml
 *.csv
+*.json
+*.npz
+*.pdf
 
 # IntelliJ IDEA / PyCharm / WebStorm
 *.pyc

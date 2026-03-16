@@ -43,10 +43,6 @@ def train(config, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-
     except ImportError:
         SWANLAB_AVAILABLE = False
 
-    # 创建权重目录
-    weights_dir = os.path.join(config.MODEL_DIR, "weights")
-    os.makedirs(weights_dir, exist_ok=True)
-
     # 数据集划分
     data_train, data_valid, labels_train, labels_valid = train_test_split(
         data, labels, test_size=0.1, shuffle=True
@@ -165,7 +161,7 @@ def train(config, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-
                 text += f" ⭐ Best"
 
                 # 保存最佳模型到指定路径
-                best_file_path = os.path.join(weights_dir, "Extractor_best.pth")
+                best_file_path = os.path.join(config.MODEL_WEIGHTS_DIR, "Extractor_best.pth")
                 torch.save(model.state_dict(), best_file_path)
                 tqdm.write(f"Best model saved to {best_file_path} (Acc: {accuracy:.2f}%)")
 
@@ -187,13 +183,13 @@ def train(config, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-
             if config.TEST_LIST and (epoch + 1) in config.TEST_LIST:
                 # 保存模型到指定路径
                 file_name = f"Extractor_{epoch + 1}.pth"
-                file_path = os.path.join(weights_dir, file_name)
+                file_path = os.path.join(config.MODEL_WEIGHTS_DIR, file_name)
                 torch.save(model.state_dict(), file_path)
                 tqdm.write(f"Model saved to {file_path}")
 
                 # 绘制loss折线图
                 if config.TEST_LIST and (epoch + 1) in config.TEST_LIST[-3:]:
-                    pic_save_path = os.path.join(config.MODEL_DIR, f"loss_{epoch+1}.png")
+                    pic_save_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"loss_{epoch+1}.png")
                     plot_loss_curve(loss_per_epoch, num_epochs, config.NET_TYPE, config.PREPROCESS_TYPE, pic_save_path)
 
 

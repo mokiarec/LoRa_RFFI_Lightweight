@@ -65,8 +65,6 @@ class Config:
         self.NET_TYPE = net_type
         # 数据预处理类型
         self.PREPROCESS_TYPE = kwargs.get('preprocess_type', PreprocessType.STFT)
-        # 蒸馏训练模式: [ALL, ONLY_DISTILLATE, ONLY_TEST, ONLY_ROGUE]
-        self.DISTILLATE_MODE = kwargs.get('distillate_mode', DistillateMode.ONLY_TEST)
         # PCA设置
         self.IS_PCA_TRAIN = kwargs.get('is_pca_train', True)    # 训练时
         self.IS_PCA_TEST = kwargs.get('is_pca_test', True)      # 测试时
@@ -91,9 +89,10 @@ class Config:
         # 超参数
         self.HP = {
             "batch_size": kwargs.get('batch_size', 16),
-            "num_epochs": kwargs.get('num_epochs', 200),
+            "num_epochs": kwargs.get('num_epochs', max(self.TEST_LIST)),
             "learning_rate": kwargs.get('learning_rate', 1e-3),
-            "weight_decay": kwargs.get('weight_decay', 1e-4),
+            "temperature": kwargs.get('temperature', 3.0),  # 蒸馏温度参数
+            "alpha": kwargs.get('alpha', 0.7),  # 蒸馏损失权重参数
             "gamma": kwargs.get('gamma', 0.1),  # 学习率衰减率
             "patience": kwargs.get('patience', 20),  # 早停耐心值
             "triplet_margin": kwargs.get('margin', 1.0),  # 三元组损失 Margin
@@ -104,6 +103,47 @@ class Config:
         # 基础版本号 (可选，用于继承关系)
         self.BASE_VERSION = kwargs.get('base_version', None)  # 如 "01", "02"
 
+        # 获取基础模型路径
+        if 'base_model_dir' in kwargs:
+            self.BASE_MODEL_DIR = kwargs['base_model_dir']
+        elif self.BASE_VERSION:
+            # 如果未直接提供 base_model 但指定了 BASE_VERSION，则自动查找对应目录
+            exp_prefix = f"EXP_{self.BASE_VERSION}"
+            parent_dir = get_experiment_dir(None)
+            # 在父目录下查找以 EXP_{BASE_VERSION} 开头的目录
+            matching_dirs = [d for d in os.listdir(parent_dir) if d.startswith(exp_prefix) and os.path.isdir(os.path.join(parent_dir, d))]
+            if matching_dirs:
+                # 取第一个匹配项（可按需调整排序逻辑，例如按时间排序）
+                self.BASE_MODEL_DIR = os.path.join(parent_dir, matching_dirs[0])
+            else:
+                self.BASE_MODEL_DIR = None
+        else:
+            self.BASE_MODEL_DIR = None
+        # 从 BASE_MODEL_DIR 解析基础网络类型 (例如从 ".../EXP_02_ResNet_Base" 中提取 "ResNet")
+        if self.BASE_MODEL_DIR:
+            dir_name = os.path.basename(self.BASE_MODEL_DIR)
+            parts = dir_name.split('_')
+            # 假设目录命名格式为 EXP_{version}_{NetType}_{Description}
+            if len(parts) >= 3:
+                net_type_str = parts[2]
+                # 尝试匹配 NetworkType 枚举，防止大小写或命名不一致
+                try:
+                    self.BASE_NET_TYPE = NetworkType(net_type_str)
+                except ValueError:
+                    # 如果直接匹配失败，尝试不区分大小写或常见变体匹配（可选增强鲁棒性）
+                    for member in NetworkType:
+                        if member.value.lower() == net_type_str.lower():
+                            self.BASE_NET_TYPE = member
+                            break
+                    else:
+                        # 若仍未找到，默认使用 ResNet 或抛出警告/设为 None，此处设为 None 并打印警告
+                        print(f"Warning: 无法识别的基础网络类型 '{net_type_str}'，源自目录 '{dir_name}'")
+                        self.BASE_NET_TYPE = None
+            else:
+                print(f"Warning: 基础模型目录名称格式不符合预期: '{dir_name}'")
+                self.BASE_NET_TYPE = None
+        else:
+            self.BASE_NET_TYPE = None
         # 生成模型路径
         # 仅当提供了参数时，才生成实验名称和目录
         if 'exp_name' in kwargs:
@@ -114,13 +154,11 @@ class Config:
                 self.EXP_DESCRIPTION,
                 base_version=self.BASE_VERSION
             )
+        # 获取实验模型路径
         if 'model_dir' in kwargs:
             self.MODEL_DIR = kwargs['model_dir']
         else:
-            self.MODEL_DIR = get_experiment_dir(self.EXP_NAME)
-            
-        self.MODEL_WEIGHTS_DIR = os.path.join(self.MODEL_DIR, "weights")
-        self.MODEL_EVAL_DIR = os.path.join(self.MODEL_DIR, "eval")
+            self.MODEL_DIR, self.MODEL_WEIGHTS_DIR, self.MODEL_EVAL_DIR = get_experiment_dir(self.EXP_NAME)
 
         # 新生成数据集文件路径
         if self.PREPROCESS_TYPE == PreprocessType.STFT:
