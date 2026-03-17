@@ -322,12 +322,6 @@ def get_experiment_dir(experiment_name):
     else:
         return CHECKPOINTS_DIR
 
-# 数据集文件路径
-def get_dataset(key):
-    """获取数据集路径的辅助函数"""
-    if key in DATASET:
-        return DATASET[key]
-    raise ValueError(f"未知数据集：{key}")
 
 # 论文输出文件路径
 PAPER_OUTPUT_FILES = {

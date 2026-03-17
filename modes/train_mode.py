@@ -3,7 +3,6 @@ import math
 import os
 import time
 
-import swanlab
 import torch
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
@@ -17,7 +16,7 @@ from plot.plot_loss import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 
 
-def train(config, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3):
+def train(config, data, labels, batch_size, num_epochs, learning_rate):
     """
     准备数据并训练三元组网络模型。
 
@@ -30,11 +29,12 @@ def train(config, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-
     6. 记录每个epoch的损失, 并在指定的轮次(test_list)保存模型状态字典。
     7. 在训练的最后几个轮次(test_list[-3:]), 绘制损失随epoch变化的图表并保存。
 
-    :param data: 输入数据, 通常为图像特征向量。
+    :param config: 配置对象，包含模型类型、预处理类型、测试点列表等配置信息
+    :param data: 输入数据，通常为图像特征向量。
     :param labels: 输入数据的标签。
-    :param batch_size: 批处理大小, 每次迭代训练的网络输入数量。默认为32。
-    :param num_epochs: 训练的轮数(遍历整个数据集的次数)。默认为200。
-    :param learning_rate: 学习率, 控制优化器更新权重的步长。默认为1e-3。
+    :param batch_size: 批处理大小，每次迭代训练的网络输入数量。默认为 32。
+    :param num_epochs: 训练的轮数 (遍历整个数据集的次数)。默认为 200。
+    :param learning_rate: 学习率，控制优化器更新权重的步长。默认为 1e-3。
     """
 
     try:

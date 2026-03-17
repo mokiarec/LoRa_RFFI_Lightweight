@@ -65,7 +65,7 @@ def load_generate_triplet(file_path, dev_range, pkt_range, generate_type, snr_ra
 def prepare_train_data(
         new_file_flag,
         filename_train_prepared_data,
-        path_train_original_data,
+        path_train_data,
         dev_range=None,
         pkt_range=None,
         snr_range=None,
@@ -84,7 +84,7 @@ def prepare_train_data(
         # 需要新处理数据
         print("Data Converting...")
 
-        data, labels = load_data(path_train_original_data, dev_range, pkt_range)
+        data, labels = load_data(path_train_data, dev_range, pkt_range)
         if generate_type != PreprocessType.IQ and snr_range is not None:
             data = awgn(data, snr_range)
 

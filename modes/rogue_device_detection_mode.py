@@ -6,27 +6,22 @@ import torch
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
-from core.config import Config, Mode
+from core.config import Config
 from plot.plot_roc import evaluate_and_plot_roc
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 
 def test_rogue_device_detection(
     config: Config,
-    mode: str = None,
     file_path_enrol: str=None,
-    dev_range_enrol: np.array=None,
-    pkt_range_enrol: np.array=None,
+    dev_range_enrol: np.ndarray=None,
+    pkt_range_enrol: np.ndarray=None,
     file_path_legitimate: str=None,
-    dev_range_legitimate: np.array=None,
-    pkt_range_legitimate: np.array=None,
+    dev_range_legitimate: np.ndarray=None,
+    pkt_range_legitimate: np.ndarray=None,
     file_path_rogue: str=None,
-    dev_range_rogue: np.array=None,
-    pkt_range_rogue: np.array=None,
-    net_type=None,
-    preprocess_type=None,
-    test_list=None,
-    model_dir=None,
+    dev_range_rogue: np.ndarray=None,
+    pkt_range_rogue: np.ndarray=None,
     is_pac=False,
     wst_j=None,
     wst_q=None
@@ -34,7 +29,6 @@ def test_rogue_device_detection(
     """
     该函数使用特征提取模型对恶意设备进行检测, 并返回相关的检测结果和性能指标。
 
-    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param file_path_enrol (str): 注册数据集的路径。
     :param dev_range_enrol (tuple): 注册数据集中设备的范围。
     :param pkt_range_enrol (tuple): 注册数据集中数据包的范围。
@@ -44,10 +38,6 @@ def test_rogue_device_detection(
     :param file_path_rogue (str): 恶意设备数据集的路径。
     :param dev_range_rogue (tuple): 恶意设备数据集中设备的范围。
     :param pkt_range_rogue (tuple): 恶意设备数据集中数据包的范围。
-    :param net_type: 网络类型
-    :param preprocess_type: 预处理类型
-    :param test_list: 测试列表
-    :param model_dir: 模型目录路径
     :param wst_j: WST J参数
     :param wst_q: WST Q参数
 
@@ -57,10 +47,6 @@ def test_rogue_device_detection(
     :return eer (float): 等错误率。
     """
 
-    # 子目录路径
-    if mode == Mode.ROGUE_DEVICE_DETECTION:
-        mode = 'origin'
-    model_dir = os.path.join(model_dir, mode)
     print(f"PCA used!!" if is_pac else "PCA not used!!")
 
     # 投票参数
@@ -73,7 +59,7 @@ def test_rogue_device_detection(
     print("\nDevice enrolling...")
     # 加载注册数据集(IQ样本和标签)
     label_enrol, triplet_data_enrol = load_generate_triplet(
-        file_path_enrol, dev_range_enrol, pkt_range_enrol, preprocess_type
+        file_path_enrol, dev_range_enrol, pkt_range_enrol, config.PREPROCESS_TYPE
     )
 
     """
@@ -96,7 +82,7 @@ def test_rogue_device_detection(
     )
 
     # 提取特征
-    data_test = generate_spectrogram(data_test, preprocess_type, wst_j, wst_q)
+    data_test = generate_spectrogram(data_test, config.PREPROCESS_TYPE, wst_j, wst_q)
 
     # 准备三元组数据
     triplet_data_test = [
@@ -111,14 +97,20 @@ def test_rogue_device_detection(
         torch.tensor(x).float() for x in triplet_data_test
     ]
 
-    for epoch in test_list or []:
-        print()
-        model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
+    # 构建待测试的模型列表：包含 config.TEST_LIST 中的数字编号以及 'best_model'
+    test_epochs = (config.TEST_LIST or []) + ['best_model']
+
+    for epoch in test_epochs:
+        # 根据 epoch 类型构建模型路径
+        if epoch == 'best_model':
+            model_path = os.path.join(config.MODEL_WEIGHTS_DIR, "Extractor_best.pth")
+        else:
+            model_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"Extractor_{epoch}.pth")
 
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, net_type, preprocess_type)
+            model = load_model(model_path, config.NET_TYPE, config.PREPROCESS_TYPE)
             print("Model loaded!!!")
 
             """

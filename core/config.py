@@ -18,8 +18,10 @@ class Mode(str, Enum):
     """运行模式枚举"""
     TRAIN = "train"                    # 训练模式 - 用于训练基础模型
     CLASSIFICATION = "clf"  # 分类模式 - 用于设备指纹分类任务
+    MULTI_CLASSIFICATION = "multi_clf"  # 多数据集分类评估模式 - 用于跨场景泛化能力测试
     ROGUE_DEVICE_DETECTION = "rogue"  # 恶意设备检测模式 - 用于检测非法设备
     DISTILLATION = "distill"      # 蒸馏模式 - 用于知识蒸馏训练轻量级模型
+    LATENCY_BENCHMARK = "benchmark"   # 延迟基准测试模式 - 用于评估模型推理速度
 
 
 class DistillateMode(Enum):
@@ -96,6 +98,7 @@ class Config:
             "gamma": kwargs.get('gamma', 0.1),  # 学习率衰减率
             "patience": kwargs.get('patience', 20),  # 早停耐心值
             "triplet_margin": kwargs.get('margin', 1.0),  # 三元组损失 Margin
+            "benchmark_runs": kwargs.get('benchmark_runs', 10),  # 基准测试运行次数
         }
 
         # 实验描述
@@ -155,10 +158,7 @@ class Config:
                 base_version=self.BASE_VERSION
             )
         # 获取实验模型路径
-        if 'model_dir' in kwargs:
-            self.MODEL_DIR = kwargs['model_dir']
-        else:
-            self.MODEL_DIR, self.MODEL_WEIGHTS_DIR, self.MODEL_EVAL_DIR = get_experiment_dir(self.EXP_NAME)
+        self.MODEL_DIR, self.MODEL_WEIGHTS_DIR, self.MODEL_EVAL_DIR = get_experiment_dir(self.EXP_NAME)
 
         # 新生成数据集文件路径
         if self.PREPROCESS_TYPE == PreprocessType.STFT:

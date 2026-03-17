@@ -40,144 +40,164 @@ class DatasetInfo:
 
 DATASET = {
     # ==================== 训练集 ====================
-    'train_no_aug': DatasetInfo(
-        name="Train No Aug",
-        path=TRAIN_DATASET_DIR / "dataset_training_no_aug.h5",
-        note="无增强训练数据"
-    ),
+    "Train":{
+        'no_aug': DatasetInfo(
+            name="Train No Aug",
+            path=TRAIN_DATASET_DIR / "dataset_training_no_aug.h5",
+            dev_range=np.arange(0, 30),
+            pkt_range=np.arange(0, 1000),
+            note="无增强训练数据"
+        ),
 
-    'train_aug': DatasetInfo(
-        name="Train Aug",
-        path=TRAIN_DATASET_DIR / "dataset_training_aug.h5",
-        note="带增强训练数据"
-    ),
+        'aug': DatasetInfo(
+            name="Train Aug",
+            path=TRAIN_DATASET_DIR / "dataset_training_aug.h5",
+            dev_range=np.arange(0, 30),
+            pkt_range=np.arange(0, 1000),
+            note="带增强训练数据"
+        ),
 
-    'train_aug_0hz': DatasetInfo(
-        name="Train Aug 0Hz",
-        path=TRAIN_DATASET_DIR / "dataset_training_aug_0hz.h5",
-        note="0Hz 频偏增强训练数据"
-    ),
+        'aug_0hz': DatasetInfo(
+            name="Train Aug 0Hz",
+            path=TRAIN_DATASET_DIR / "dataset_training_aug_0hz.h5",
+            dev_range=np.arange(0, 30),
+            pkt_range=np.arange(0, 500),
+            note="0Hz 频偏增强训练数据"
+        ),
+    },
 
     # ==================== 基础测试集 ====================
-    'test_seen': DatasetInfo(
-        name="Seen Devices",
-        path=TEST_DATASET_DIR / "dataset_seen_devices.h5",
-        dev_range=np.arange(0, 30),
-        pkt_range=np.arange(0, 100),
-        note="Residential, LOS, stationary"
-    ),
+    "Test": {
+        'seen': DatasetInfo(
+            name="Seen Devices",
+            path=TEST_DATASET_DIR / "dataset_seen_devices.h5",
+            dev_range=np.arange(0, 30),
+            pkt_range=np.arange(0, 400),
+            note="Residential, LOS, stationary"
+        ),
 
-    'test_residential': DatasetInfo(
-        name="Residential Enrol",
-        path=TEST_DATASET_DIR / "dataset_residential.h5",
-        dev_range=np.arange(0, 30),
-        pkt_range=np.arange(0, 100),
-        note="住宅环境注册数据"
-    ),
+        'rogue': DatasetInfo(
+            name="Rogue Device Detection",
+            path=TEST_DATASET_DIR / "dataset_rogue.h5",
+            dev_range=np.arange(40, 45),
+            pkt_range=np.arange(0, 200),
+            note="Residential, LOS, stationary - 用于恶意设备检测"
+        ),
 
-    'test_rogue': DatasetInfo(
-        name="Rogue Device Detection",
-        path=TEST_DATASET_DIR / "dataset_rogue.h5",
-        dev_range=np.arange(0, 30),
-        pkt_range=np.arange(0, 100),
-        note="Residential, NLOS, stationary - 用于恶意设备检测"
-    ),
+        'residential': DatasetInfo(
+            name="Residential Enrol",
+            path=TEST_DATASET_DIR / "dataset_residential.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(4, 100),
+            note="Residential, LOS, stationary - 住宅环境注册数据"
+        ),
+
+        'other': DatasetInfo(
+            name="Other Device Type",
+            path=TEST_DATASET_DIR / "dataset_other_device_type.h5",
+            dev_range=np.arange(46, 60),
+            pkt_range=np.arange(0, 400),
+            note="Residential, LOS, stationary - 用于其他设备类型"
+        ),
+    },
 
     # ==================== 信道场景 A-F (Channel Problem) ====================
-    'A': DatasetInfo(
-        name="Channel A (LOS)",
-        path=CHANNEL_PROBLEM_DIR / "A.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="LOS, stationary"
-    ),
+    "Channel": {
+        'A': DatasetInfo(
+            name="Channel A (LOS)",
+            path=CHANNEL_PROBLEM_DIR / "A.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="LOS, stationary"
+        ),
 
-    'B': DatasetInfo(
-        name="Channel B (LOS)",
-        path=CHANNEL_PROBLEM_DIR / "B.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="LOS, stationary"
-    ),
+        'B': DatasetInfo(
+            name="Channel B (LOS)",
+            path=CHANNEL_PROBLEM_DIR / "B.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="LOS, stationary"
+        ),
 
-    'C': DatasetInfo(
-        name="Channel C (LOS)",
-        path=CHANNEL_PROBLEM_DIR / "C.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="LOS, stationary"
-    ),
+        'C': DatasetInfo(
+            name="Channel C (LOS)",
+            path=CHANNEL_PROBLEM_DIR / "C.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="LOS, stationary"
+        ),
 
-    'D': DatasetInfo(
-        name="Channel D (NLOS)",
-        path=CHANNEL_PROBLEM_DIR / "D.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="NLOS, stationary"
-    ),
+        'D': DatasetInfo(
+            name="Channel D (NLOS)",
+            path=CHANNEL_PROBLEM_DIR / "D.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="NLOS, stationary"
+        ),
 
-    'E': DatasetInfo(
-        name="Channel E (NLOS)",
-        path=CHANNEL_PROBLEM_DIR / "E.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="NLOS, stationary"
-    ),
+        'E': DatasetInfo(
+            name="Channel E (NLOS)",
+            path=CHANNEL_PROBLEM_DIR / "E.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="NLOS, stationary"
+        ),
 
-    'F': DatasetInfo(
-        name="Channel F (NLOS)",
-        path=CHANNEL_PROBLEM_DIR / "F.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="NLOS, stationary"
-    ),
+        'F': DatasetInfo(
+            name="Channel F (NLOS)",
+            path=CHANNEL_PROBLEM_DIR / "F.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="NLOS, stationary"
+        ),
 
-    # ==================== 移动性与天线 (Mobility & Antenna) ====================
-    'B_walk': DatasetInfo(
-        name="B walk (LOS)",
-        path=CHANNEL_PROBLEM_DIR / "B_walk.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Object moving"
-    ),
+        # ==================== 移动性与天线 (Mobility & Antenna) ====================
+        'B_walk': DatasetInfo(
+            name="B walk (LOS)",
+            path=CHANNEL_PROBLEM_DIR / "B_walk.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Object moving"
+        ),
 
-    'F_walk': DatasetInfo(
-        name="F walk (NLOS)",
-        path=CHANNEL_PROBLEM_DIR / "F_walk.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Object moving"
-    ),
+        'F_walk': DatasetInfo(
+            name="F walk (NLOS)",
+            path=CHANNEL_PROBLEM_DIR / "F_walk.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Object moving"
+        ),
 
-    'moving_office': DatasetInfo(
-        name="Moving Office",
-        path=CHANNEL_PROBLEM_DIR / "moving_office.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Mobile"
-    ),
+        'moving_office': DatasetInfo(
+            name="Moving Office",
+            path=CHANNEL_PROBLEM_DIR / "moving_office.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Mobile"
+        ),
 
-    'moving_meeting_room': DatasetInfo(
-        name="Moving Meeting Room",
-        path=CHANNEL_PROBLEM_DIR / "moving_meeting_room.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Mobile, NLOS"
-    ),
+        'moving_meeting_room': DatasetInfo(
+            name="Moving Meeting Room",
+            path=CHANNEL_PROBLEM_DIR / "moving_meeting_room.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Mobile, NLOS"
+        ),
 
-    'B_antenna': DatasetInfo(
-        name="B antenna",
-        path=CHANNEL_PROBLEM_DIR / "B_antenna.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Parallel antenna"
-    ),
+        'B_antenna': DatasetInfo(
+            name="B antenna",
+            path=CHANNEL_PROBLEM_DIR / "B_antenna.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Parallel antenna"
+        ),
 
-    'F_antenna': DatasetInfo(
-        name="F antenna",
-        path=CHANNEL_PROBLEM_DIR / "F_antenna.h5",
-        dev_range=np.arange(30, 40),
-        pkt_range=np.arange(0, 200),
-        note="Parallel antenna, NLOS"
-    ),
+        'F_antenna': DatasetInfo(
+            name="F antenna",
+            path=CHANNEL_PROBLEM_DIR / "F_antenna.h5",
+            dev_range=np.arange(30, 40),
+            pkt_range=np.arange(0, 200),
+            note="Parallel antenna, NLOS"
+        ),
+    }
 }

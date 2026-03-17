@@ -21,30 +21,27 @@ from utils.better_print import TextAnimator
 
 
 def test_classification(
-    config: Config,
-    file_path_enrol: str=None,
-    file_path_clf: str=None,
-    dev_range_enrol: np.array=None,
-    dev_range_clf: np.array=None,
-    pkt_range_enrol: np.array=None,
-    pkt_range_clf: np.array=None,
-    snr_range=None,
-    is_pac=True,
-    enable_plots=True,
+        config: Config,
+        dataset_name,
+        file_path_enrol: str = None,
+        file_path_clf: str = None,
+        dev_range_enrol: np.ndarray = None,
+        dev_range_clf: np.ndarray = None,
+        pkt_range_enrol: np.ndarray = None,
+        pkt_range_clf: np.ndarray = None,
+        snr_range=None,
+        is_pac=False,
+        enable_plots=True,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
 
-    :param model_dir: 模型目录路径
     :param file_path_enrol (str): 注册数据集的文件路径。
     :param file_path_clf (str): 分类数据集的文件路径。
     :param dev_range_enrol: 注册数据集中设备的范围。
     :param dev_range_clf: 分类数据集中设备的范围。
     :param pkt_range_enrol: 注册数据集中数据包的范围。
     :param pkt_range_clf: 分类数据集中数据包的范围。
-    :param net_type: 网络类型
-    :param preprocess_type: 预处理类型
-    :param test_list: 测试点列表
     :param is_pac: 是否使用PAC降维
     :param enable_plots: 控制是否绘制混淆矩阵（默认为True）
     """
@@ -84,7 +81,6 @@ def test_classification(
     # 存储所有 epoch 的结果用于汇总
     all_epoch_results = []
 
-
     # 构建待测试的模型列表：包含 config.TEST_LIST 中的数字编号以及 'best_model'
     test_epochs = (config.TEST_LIST or []) + ['best_model']
 
@@ -92,17 +88,11 @@ def test_classification(
         print()
         print("=============================")
 
-        # 保存路径
-        weights_dir = os.path.join(config.MODEL_DIR, "weights")
-        eval_dir = os.path.join(config.MODEL_DIR, "eval")
-        
         # 根据 epoch 类型构建模型路径
-        if isinstance(epoch, int) or (isinstance(epoch, str) and epoch.isdigit()):
-            model_path = os.path.join(weights_dir, f"Extractor_{epoch}.pth")
-        elif epoch == 'best_model':
-            model_path = os.path.join(weights_dir, "Extractor_best.pth")
+        if epoch == 'best_model':
+            model_path = os.path.join(config.MODEL_WEIGHTS_DIR, "Extractor_best.pth")
         else:
-            model_path = os.path.join(weights_dir, f"Extractor_{epoch}.pth")
+            model_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"Extractor_{epoch}.pth")
 
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
@@ -250,54 +240,24 @@ def test_classification(
                 # 确保保存目录存在
                 if not os.path.exists(model_path):
                     os.makedirs(model_path)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.NET_TYPE, config.PREPROCESS_TYPE, vote_size, eval_dir)
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.NET_TYPE, config.PREPROCESS_TYPE, vote_size,
+                                        config.MODEL_EVAL_DIR)
 
             # 记录到 SwanLab
             if SWANLAB_AVAILABLE:
+                suffix = "_pca" if is_pac else ""
                 # 记录准确率指标
                 swanlab.log({
-                    f"classification/epoch": epoch,
-                    f"classification/knn_wo_accuracy": wo_acc_knn * 100,
-                    f"classification/svm_wo_accuracy": wo_acc_svm * 100,
-                    f"classification/knn_w_accuracy": w_acc_knn * 100,
-                    f"classification/svm_w_accuracy": w_acc_svm * 100,
-                    f"classification/combined_accuracy": acc_combined * 100,
-                    f"classification/enrol_feature_time": enrol_feature_extraction_time,
-                    f"classification/clf_feature_time": clf_feature_extraction_time,
-                    f"classification/prediction_time": prediction_time,
+                    f"knn_wo_accuracy{suffix}/{dataset_name}": wo_acc_knn * 100,
+                    # f"svm_wo_accuracy/{dataset_name}": wo_acc_svm * 100,
+                    f"knn_w_accuracy/{dataset_name}": w_acc_knn * 100,
+                    # f"svm_w_accuracy/{dataset_name}": w_acc_svm * 100,
+                    # f"combined_accuracy/{dataset_name}": acc_combined * 100,
                 }, step=epoch)
-
-                # 上传混淆矩阵图片
-                cm_path = os.path.join(eval_dir, f"clf_{epoch}.png")
-
-                if os.path.exists(cm_path):
-                    swanlab.log({
-                        f"classification/confusion_matrix": swanlab.Image(cm_path)
-                    }, step=epoch)
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
         print("=============================")
-
-        # 存储当前 epoch 的结果
-        all_epoch_results.append({
-            "epoch": epoch,
-            "knn_wo": wo_acc_knn,
-            "svm_wo": wo_acc_svm,
-            "knn_w": w_acc_knn,
-            "svm_w": w_acc_svm,
-            "combined": acc_combined,
-        })
-
-    # 记录汇总统计到 SwanLab
-    if SWANLAB_AVAILABLE and all_epoch_results:
-        # 记录最佳结果
-        best_result = max(all_epoch_results, key=lambda x: x["combined"])
-        swanlab.log({
-            "classification/best_epoch": best_result["epoch"],
-            "classification/best_combined_accuracy": best_result["combined"] * 100,
-            "classification/avg_combined_accuracy": np.mean([r["combined"] for r in all_epoch_results]) * 100,
-        })
 
     return {
         "knn_wo": wo_acc_knn,
@@ -305,7 +265,4 @@ def test_classification(
         "knn_w": w_acc_knn,
         "svm_w": w_acc_svm,
         "combined": acc_combined,
-        "time_enrol": enrol_feature_extraction_time,
-        "time_clf_feat": clf_feature_extraction_time,
-        "time_predict": prediction_time  # 包含分类特征提取+分类器预测+投票的总时间
     }

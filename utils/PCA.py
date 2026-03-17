@@ -164,7 +164,7 @@ if __name__ == '__main__':
     data, labels = prepare_train_data(
         config.new_file_flag,
         config.filename_train_prepared_data,
-        path_train_original_data="../dataset/Train/dataset_training_no_aug.h5",
+        path_train_data="../dataset/Train/dataset_training_no_aug.h5",
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
