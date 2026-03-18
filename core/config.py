@@ -95,10 +95,10 @@ class Config:
             "learning_rate": kwargs.get('learning_rate', 1e-3),
             "temperature": kwargs.get('temperature', 3.0),  # 蒸馏温度参数
             "alpha": kwargs.get('alpha', 0.7),  # 蒸馏损失权重参数
-            "gamma": kwargs.get('gamma', 0.1),  # 学习率衰减率
             "patience": kwargs.get('patience', 20),  # 早停耐心值
             "triplet_margin": kwargs.get('margin', 1.0),  # 三元组损失 Margin
             "benchmark_runs": kwargs.get('benchmark_runs', 10),  # 基准测试运行次数
+            "snr": kwargs.get('snr', None)
         }
 
         # 实验描述

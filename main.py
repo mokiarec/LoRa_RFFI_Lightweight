@@ -1,5 +1,6 @@
 """项目主入口文件"""
 import os
+import numpy as np
 
 from core.config import set_seed, Config, Mode, DEVICE, NetworkType
 from core.controller import main
@@ -16,7 +17,8 @@ if __name__ == "__main__":
     # config1 = Config(
     #     mode=Mode.TRAIN,
     #     net_type=NetworkType.MobileNetV1,
-    #     exp_description="Base"
+    #     exp_description="Base",
+    #     snr = np.arange(20, 80),
     # )
     # config1.save_to_json()
 
@@ -34,6 +36,7 @@ if __name__ == "__main__":
     #     net_type=NetworkType.LightNet,
     #     exp_description="KD_PCA16",
     #     base_version="02",  # 基于 EXP_02
+    #     snr = np.arange(20, 80),
     #     is_pca_train=True,
     # )
     # config3.save_to_json()
@@ -48,7 +51,7 @@ if __name__ == "__main__":
     # --- 示例 5: 多分类实验 (EXP_01) ---
     config5 = Config.from_json(
         mode=Mode.MULTI_CLASSIFICATION,
-        model_dir="./checkpoints/EXP_01_LightNet_Base"
+        model_dir="./checkpoints/EXP_02_ResNet_Base"
     )
 
 
@@ -68,17 +71,21 @@ if __name__ == "__main__":
         current_exp_name = f"{config.EXP_NAME}"
         custom_logdir = os.path.join(config.MODEL_DIR, "swanlog")
         try:
-            run = swanlab.init(
+            swanlab.login()
+            swanlab.init(
                 project="Lightweight_LoRa_RFFI",
                 experiment_name=current_exp_name,
                 resume=True,
-                id="li3n54zbm04pc8brr9a1u",
+                id="pwqr0un0fkph9ce2zz9t6",
                 config={
                     "network_type": config.NET_TYPE.value,
                     "preprocess_type": config.PREPROCESS_TYPE.value,
                     "batch_size": config.HP['batch_size'],
                     "num_epochs": config.HP['num_epochs'],
                     "learning_rate": config.HP['learning_rate'],
+                    # "temperature": config.HP['temperature'],
+                    # "alpha": config.HP['alpha'],
+                    # "snr": config.HP['snr'],
                     "pca_dim_train": config.PCA_DIM_TRAIN if config.IS_PCA_TRAIN else None,
                     "test_list": config.TEST_LIST,
                     "device": str(DEVICE),

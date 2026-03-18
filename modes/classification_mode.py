@@ -13,7 +13,7 @@ from sklearn.svm import SVC
 
 from core.config import Config  # Config枚举型
 from plot.plot_confusion import plot_confusion_matrices
-from training_utils.data_preprocessor import load_generate_triplet, load_model
+from training_utils.data_preprocessor import load_generate, load_model
 # 工具包
 from utils.FLOPs import calculate_flops_and_params
 from utils.PCA import plot_pca_scree
@@ -64,13 +64,13 @@ def test_classification(
 
     # 加载注册数据集(IQ样本和标签)
     print("\nData loading...")
-    label_enrol, triplet_data_enrol = load_generate_triplet(
+    label_enrol, data_enrol = load_generate(
         file_path_enrol, dev_range_enrol, pkt_range_enrol,
         config.PREPROCESS_TYPE, snr_range=snr_range
     )
 
     # 加载分类数据集(IQ样本和标签)
-    label_clf, triplet_data_clf = load_generate_triplet(
+    label_clf, data_clf = load_generate(
         file_path_clf, dev_range_clf, pkt_range_clf,
         config.PREPROCESS_TYPE, snr_range=snr_range
     )
@@ -101,7 +101,7 @@ def test_classification(
             print("Model loaded!!!")
 
             # 计算FLOPs和参数量
-            calculate_flops_and_params(model, triplet_data_clf)
+            calculate_flops_and_params(model, data_clf)
 
             # 提取特征
             # print("Feature extracting...")
@@ -110,19 +110,19 @@ def test_classification(
                 text.start()
                 with torch.no_grad():
                     start_time = time.time()
-                    feature_enrol = model(*triplet_data_enrol)
+                    feature_enrol = model.predict(data_enrol)
                     enrol_feature_extraction_time = time.time() - start_time
 
                 # 碎石图绘制逻辑
                 plot_scree = False
                 scree_max_components = 64
                 if plot_scree:
-                    plot_pca_scree(feats=feature_enrol[0], max_components=scree_max_components)
+                    plot_pca_scree(feats=feature_enrol, max_components=scree_max_components)
 
                 if is_pac:
                     pca = PCA(n_components=config.PCA_DIM_TEST)
-                    pca.fit(feature_enrol[0])  # 只用 enrollment 特征
-                    feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
+                    pca.fit(feature_enrol)  # 只用 enrollment 特征
+                    feature_enrol_pca = pca.transform(feature_enrol)  # 投影到低维
 
                 # 使用 K-NN 分类器进行训练
                 knnclf = KNeighborsClassifier(n_neighbors=5, metric="euclidean")
@@ -132,8 +132,8 @@ def test_classification(
                     svmclf.fit(feature_enrol_pca, label_enrol.ravel())
                     knnclf.fit(feature_enrol_pca, label_enrol.ravel())
                 else:
-                    svmclf.fit(feature_enrol[0], label_enrol.ravel())
-                    knnclf.fit(feature_enrol[0], label_enrol.ravel())
+                    svmclf.fit(feature_enrol, label_enrol.ravel())
+                    knnclf.fit(feature_enrol, label_enrol.ravel())
             finally:
                 text.stop()
 
@@ -149,7 +149,7 @@ def test_classification(
                 # 提取分类数据集的特征
                 with torch.no_grad():
                     start_time = time.time()
-                    feature_clf = model(*triplet_data_clf)
+                    feature_clf = model.predict(data_clf)
                     clf_feature_extraction_time = time.time() - start_time
 
                 start_time = time.time()
@@ -157,12 +157,12 @@ def test_classification(
                 # K-NN和SVM的初步预测
                 if is_pac:
                     # SVM和KNN 投影到 PCA
-                    feature_clf_pca = pca.transform(feature_clf[0])
+                    feature_clf_pca = pca.transform(feature_clf)
                     pred_label_svm_wo = svmclf.predict(feature_clf_pca)
                     pred_label_knn_wo = knnclf.predict(feature_clf_pca)
                 else:
-                    pred_label_svm_wo = svmclf.predict(feature_clf[0])
-                    pred_label_knn_wo = knnclf.predict(feature_clf[0])
+                    pred_label_svm_wo = svmclf.predict(feature_clf)
+                    pred_label_knn_wo = knnclf.predict(feature_clf)
 
                 def apply_voting(labels, vote_size):
                     """应用滑动窗口投票机制"""
@@ -236,27 +236,28 @@ def test_classification(
             w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
             wwo_cms = [wo_cms, w_cms]
 
+            suffix = "_pca" if is_pac else ""
             if enable_plots:
                 # 确保保存目录存在
-                if not os.path.exists(model_path):
-                    os.makedirs(model_path)
+                save_path = os.path.join(config.MODEL_EVAL_DIR, f"{dataset_name}{suffix}")
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
                 plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.NET_TYPE, config.PREPROCESS_TYPE, vote_size,
-                                        config.MODEL_EVAL_DIR)
+                                        save_path)
 
             # 记录到 SwanLab
             if SWANLAB_AVAILABLE:
-                suffix = "_pca" if is_pac else ""
                 # 记录准确率指标
                 swanlab.log({
                     f"knn_wo_accuracy{suffix}/{dataset_name}": wo_acc_knn * 100,
                     # f"svm_wo_accuracy/{dataset_name}": wo_acc_svm * 100,
-                    f"knn_w_accuracy/{dataset_name}": w_acc_knn * 100,
+                    f"knn_w_accuracy{suffix}/{dataset_name}": w_acc_knn * 100,
                     # f"svm_w_accuracy/{dataset_name}": w_acc_svm * 100,
                     # f"combined_accuracy/{dataset_name}": acc_combined * 100,
                 }, step=epoch)
 
             # T-SNE 3D绘图
-            # tsne_3d_plot(feature_clf[0],labels=label_clf)
+            # tsne_3d_plot(feature_clf,labels=label_clf)
         print("=============================")
 
     return {

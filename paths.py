@@ -3,8 +3,6 @@ import re
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from dataset import DATASET
-
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.absolute()
 

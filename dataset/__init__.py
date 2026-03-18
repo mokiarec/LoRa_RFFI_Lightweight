@@ -17,10 +17,6 @@ TRAIN_DATASET_DIR = DATASET_ROOT / "Train"
 TEST_DATASET_DIR = DATASET_ROOT / "Test"
 CHANNEL_PROBLEM_DIR = TEST_DATASET_DIR / "channel_problem"
 
-# 确保目录存在
-for directory in [TRAIN_DATASET_DIR, TEST_DATASET_DIR, CHANNEL_PROBLEM_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
-
 
 @dataclass
 class DatasetInfo:

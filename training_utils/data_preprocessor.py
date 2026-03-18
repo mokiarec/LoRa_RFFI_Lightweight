@@ -36,13 +36,16 @@ def load_data(file_path, dev_range, pkt_range) -> tuple[np.ndarray, np.ndarray]:
 
 
 # 数据预处理
-def load_generate(file_path, dev_range, pkt_range, generate_type):
+def load_generate(file_path, dev_range, pkt_range, generate_type, snr_range=None):
     """加载 & 预处理"""
     data, label = load_data(file_path, dev_range, pkt_range)
+    # 数据加入人工白噪声
+    if snr_range is not None:
+        data = awgn(data, snr_range)
     data = generate_spectrogram(data, generate_type)
 
     # 数据三元组化并转换为张量类型
-    data = [torch.tensor(data).float() ]
+    data = torch.tensor(data).float()
 
     return label, data
 
