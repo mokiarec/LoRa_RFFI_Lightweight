@@ -12,12 +12,12 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from core.config import Config
+from core.config import Config, PreprocessType
 from core.config import DEVICE
-from net.TripletNet import TripletNet
+from net import TripletNet
 from plot.plot_loss import plot_loss_curve
-from training_utils.TripletDataset import TripletDataset, TripletLoss
-from training_utils.data_preprocessor import generate_spectrogram
+from utils.TripletDataset import TripletDataset, TripletLoss
+from utils.data_preprocessor import generate_spectrogram
 
 
 def distillation(
@@ -51,7 +51,7 @@ def distillation(
 
     try:
         import swanlab
-        SWANLAB_AVAILABLE = True
+        SWANLAB_AVAILABLE = not config.disable_swanlab
     except ImportError:
         SWANLAB_AVAILABLE = False
 
@@ -70,12 +70,12 @@ def distillation(
     )
 
     # 生成数据加载器
-    train_dataset = TripletDataset(data_train, labels_train)
+    train_dataset = TripletDataset(data_train, labels_train, PreprocessType.STFT)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化教师模型
-    teacher_model = TripletNet(net_type=config.BASE_NET_TYPE, in_channels=config.PREPROCESS_TYPE.in_channels)  # RESNET
+    teacher_model = TripletNet(net_type=config.base_net_type, in_channels=config.preprocess_type.in_channels)  # RESNET
     teacher_model.load_state_dict(torch.load(teacher_model_path))
     teacher_model.to(DEVICE)
     teacher_model.eval()
@@ -85,7 +85,7 @@ def distillation(
     valid_labels_tensor = torch.tensor(labels_valid, dtype=torch.long).to(DEVICE)
 
     # 初始化学生模型 (MobileNet)
-    student_model = TripletNet(net_type=config.NET_TYPE, in_channels=config.PREPROCESS_TYPE.in_channels)  # MobileNet
+    student_model = TripletNet(net_type=config.net_type, in_channels=config.preprocess_type.in_channels)  # MobileNet
     optimizer = optim.Adam(student_model.parameters(), lr=learning_rate)
     triplet_loss_fn = TripletLoss(margin=0.1)
 
@@ -152,11 +152,11 @@ def distillation(
                         student_anchor, student_positive, student_negative
                     )
 
-                    if is_pca:
-                        # 对学生特征进行PCA降维和归一化处理
-                        student_anchor = process_pca_features(student_anchor)
-                        student_positive = process_pca_features(student_positive)
-                        student_negative = process_pca_features(student_negative)
+                    # if is_pca:
+                    #     # 对学生特征进行PCA降维和归一化处理
+                    #     student_anchor = process_pca_features(student_anchor)
+                    #     student_positive = process_pca_features(student_positive)
+                    #     student_negative = process_pca_features(student_negative)
 
                     # 蒸馏损失（使用KL散度）
                     distill_loss = (    # 教师为目标分布, 学生为源分布
@@ -261,7 +261,7 @@ def distillation(
                 }, step=epoch + 1)
 
             # 保存训练好的模型
-            if config.TEST_LIST and (epoch + 1) in config.TEST_LIST:
+            if config.test_list and (epoch + 1) in config.test_list:
                 # 保存模型到指定路径
                 file_name = f"Extractor_{epoch + 1}.pth"
                 file_path = os.path.join(config.MODEL_WEIGHTS_DIR, file_name)
@@ -269,9 +269,9 @@ def distillation(
                 tqdm.write(f"Distilled model saved to {file_path}")
 
                 # 绘制loss折线图
-                if config.TEST_LIST and (epoch + 1) in config.TEST_LIST[-3:]:
+                if config.test_list and (epoch + 1) in config.test_list[-3:]:
                     pic_save_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"loss_{epoch+1}.png")
-                    plot_loss_curve(loss_per_epoch, num_epochs, config.NET_TYPE, config.PREPROCESS_TYPE, pic_save_path)
+                    plot_loss_curve(loss_per_epoch, num_epochs, config.net_type, config.preprocess_type, pic_save_path)
 
     # 打印最佳模型信息
     print(f"\n{'=' * 50}")

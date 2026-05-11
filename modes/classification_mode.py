@@ -13,7 +13,7 @@ from sklearn.svm import SVC
 
 from core.config import Config  # Config枚举型
 from plot.plot_confusion import plot_confusion_matrices
-from training_utils.data_preprocessor import load_generate, load_model
+from utils.data_preprocessor import load_generate, load_model
 # 工具包
 from utils.FLOPs import calculate_flops_and_params
 from utils.PCA import plot_pca_scree
@@ -48,7 +48,7 @@ def test_classification(
 
     try:
         import swanlab
-        SWANLAB_AVAILABLE = True
+        SWANLAB_AVAILABLE = not config.disable_swanlab
     except ImportError:
         SWANLAB_AVAILABLE = False
 
@@ -66,23 +66,20 @@ def test_classification(
     print("\nData loading...")
     label_enrol, data_enrol = load_generate(
         file_path_enrol, dev_range_enrol, pkt_range_enrol,
-        config.PREPROCESS_TYPE, snr_range=snr_range
+        config.preprocess_type, snr_range=snr_range
     )
 
     # 加载分类数据集(IQ样本和标签)
     label_clf, data_clf = load_generate(
         file_path_clf, dev_range_clf, pkt_range_clf,
-        config.PREPROCESS_TYPE, snr_range=snr_range
+        config.preprocess_type, snr_range=snr_range
     )
     print("\nData loaded!!!")
 
     print(f"PCA used!!" if is_pac else "PCA not used!!")
 
-    # 存储所有 epoch 的结果用于汇总
-    all_epoch_results = []
-
-    # 构建待测试的模型列表：包含 config.TEST_LIST 中的数字编号以及 'best_model'
-    test_epochs = (config.TEST_LIST or []) + ['best_model']
+    # 构建待测试的模型列表：包含 config.test_list 中的数字编号以及 'best_model'
+    test_epochs = (config.test_list or []) + ['best_model']
 
     for epoch in test_epochs:
         print()
@@ -97,7 +94,7 @@ def test_classification(
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, config.NET_TYPE, config.PREPROCESS_TYPE)
+            model = load_model(model_path, config.net_type, config.preprocess_type)
             print("Model loaded!!!")
 
             # 计算FLOPs和参数量
@@ -242,7 +239,7 @@ def test_classification(
                 save_path = os.path.join(config.MODEL_EVAL_DIR, f"{dataset_name}{suffix}")
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.NET_TYPE, config.PREPROCESS_TYPE, vote_size,
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, config.net_type, config.preprocess_type, vote_size,
                                         save_path)
 
             # 记录到 SwanLab

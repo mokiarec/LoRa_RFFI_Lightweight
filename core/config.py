@@ -3,165 +3,90 @@ import json
 import os
 import random
 from enum import Enum
+from typing import Optional, List
 
 import numpy as np
 import torch
 
+from core import Mode, PreprocessType
 from net import NetworkType
-from paths import get_experiment_dir, generate_experiment_name
+from paths import PathManager, ExperimentInfo
 
 # 设备配置
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-# 定义运行模式的枚举
-class Mode(str, Enum):
-    """运行模式枚举"""
-    TRAIN = "train"                    # 训练模式 - 用于训练基础模型
-    CLASSIFICATION = "clf"  # 分类模式 - 用于设备指纹分类任务
-    MULTI_CLASSIFICATION = "multi_clf"  # 多数据集分类评估模式 - 用于跨场景泛化能力测试
-    ROGUE_DEVICE_DETECTION = "rogue"  # 恶意设备检测模式 - 用于检测非法设备
-    DISTILLATION = "distill"      # 蒸馏模式 - 用于知识蒸馏训练轻量级模型
-    LATENCY_BENCHMARK = "benchmark"   # 延迟基准测试模式 - 用于评估模型推理速度
-
-
-# 定义预处理类型枚举
-class PreprocessType(Enum):
-    """预处理类型枚举"""
-    IQ = ("IQ", 1)      # IQ数据直接使用，2个通道（I和Q）
-    STFT = ("STFT", 1)  # 短时傅里叶变换，1个通道（幅度）
-    WST = ("WST", 2)    # 小波散射变换，2个通道（实部和虚部）
-
-    def __init__(self, name, in_channels):
-        self._value_ = name
-        self.in_channels = in_channels
+# 是否禁用 SwanLab
+DISABLE_SWANLAB = os.getenv("DISABLE_SWANLAB", "true").lower() in ("true", "1", "yes")
 
 
 # 配置类，用于存储全局配置参数
 class Config:
-    def __init__(self,
-        mode: Mode,
-        net_type: str,
-        **kwargs
-    ):
-        # 设置模式
-        self.mode = mode
-        # 网络类型
-        self.NET_TYPE = net_type
-        # 数据预处理类型
-        self.PREPROCESS_TYPE = kwargs.get('preprocess_type', PreprocessType.STFT)
+    def __init__(self, **kwargs):
+        # SwanLab 配置
+        self.disable_swanlab = DISABLE_SWANLAB
+
+        # ===== 核心参数 =====
+        self.mode: Mode = kwargs.get('mode')  # 设置模式
+        self.net_type: Optional[NetworkType] = kwargs.get('net_type', None)  # 网络类型
+        self.preprocess_type: PreprocessType = kwargs.get('preprocess_type', PreprocessType.STFT)  # 数据预处理类型
         # PCA设置
-        self.IS_PCA_TRAIN = kwargs.get('is_pca_train', True)    # 训练时
-        self.IS_PCA_TEST = kwargs.get('is_pca_test', True)      # 测试时
-        # 我们需要一个新的训练文件吗？
-        self.new_file_flag = kwargs.get('new_file_flag', True)
-
-        # CHECKPOINT列表
-        self.TEST_LIST = kwargs.get('test_list', [1, 5, 10, 20, 35, 50, 60, 70, 85, 100, 150, 200, 250, 300])
-
+        self.is_pca_train: bool = kwargs.get('is_pca_train', True)  # 训练时
+        self.is_pca_test: bool = kwargs.get('is_pca_test', True)  # 测试时
         # WST参数
-        if self.PREPROCESS_TYPE == PreprocessType.WST:
-            self.WST_J = kwargs.get('wst_j', 6)
-            self.WST_Q = kwargs.get('wst_q', 6)
-        else:
-            self.WST_J = None
-            self.WST_Q = None
-
+        self.WST_J: Optional[int] = kwargs.get('wst_j', None)
+        self.WST_Q: Optional[int] = kwargs.get('wst_q', None)
         # PCA相关的配置
-        self.PCA_DIM_TRAIN = 8  # 训练时PCA的维度
-        self.PCA_DIM_TEST = 8  # 测试时PCA的维度
+        self.PCA_DIM_TRAIN: int = kwargs.get('pca_dim_train', 8)  # 训练时PCA的维度
+        self.PCA_DIM_TEST: int = kwargs.get('pca_dim_test', 8)  # 测试时PCA的维度
+
+        # ===== 实验配置 =====
+        self.exp_description: str = kwargs.get('exp_description', 'Base')  # 实验描述
+        self.base_version: Optional[str] = kwargs.get('base_version', None)  # 继承的实验编号
+        # 我们需要一个新的训练文件吗？
+        self.new_file_flag: bool = kwargs.get('new_file_flag', True)
+        # CHECKPOINT列表
+        self.test_list: List = kwargs.get('test_list', [1, 5, 10, 20, 35, 50, 60, 70, 85, 100, 150, 200, 250, 300])
 
         # 超参数
         self.HP = {
             "batch_size": kwargs.get('batch_size', 16),
-            "num_epochs": kwargs.get('num_epochs', max(self.TEST_LIST)),
+            "num_epochs": kwargs.get('num_epochs', max(self.test_list)),
             "learning_rate": kwargs.get('learning_rate', 1e-3),
             "temperature": kwargs.get('temperature', 3.0),  # 蒸馏温度参数
             "alpha": kwargs.get('alpha', 1.0),  # 蒸馏损失权重参数
-            "patience": kwargs.get('patience', 20),  # 早停耐心值
             "triplet_margin": kwargs.get('margin', 1.0),  # 三元组损失 Margin
             "benchmark_runs": kwargs.get('benchmark_runs', 10),  # 基准测试运行次数
             "snr": kwargs.get('snr', None)
         }
 
-        # 实验描述
-        self.EXP_DESCRIPTION = kwargs.get('exp_description', 'Base')  # 如 "Base", "Pruning", "FineTune"
-        # 基础版本号 (可选，用于继承关系)
-        self.BASE_VERSION = kwargs.get('base_version', None)  # 如 "01", "02"
+        # 路径管理类实例化
+        self.path_manager = PathManager()
+        # 获取实验信息类实例化
+        self.info = self.path_manager.create_experiment(self.net_type, self.exp_description,
+                                                        base_exp_num=self.base_version)
+        # 处理父实验
+        if self.info.is_extension:
+            self.base_info = ExperimentInfo.from_name(self.path_manager.find_base_exp_path(self.info).name)
+            self.base_net_type = NetworkType[self.base_info.net_type]
 
-        # 获取基础模型信息
-        if 'base_model_dir' in kwargs:
-            self.BASE_MODEL_DIR = kwargs['base_model_dir']
-        elif self.BASE_VERSION:
-            # 如果未直接提供 base_model 但指定了 BASE_VERSION，则自动查找对应目录
-            def _find_base_model_dir(version: str) -> str | None:
-                """根据版本号自动查找基础模型目录"""
-                exp_prefix = f"EXP_{version}"
-                parent_dir = get_experiment_dir(None)
-                if not os.path.exists(parent_dir):
-                    return None
-                # 在父目录下查找以 EXP_{BASE_VERSION} 开头的目录
-                matching_dirs = [
-                    d for d in os.listdir(parent_dir) 
-                    if d.startswith(exp_prefix) and os.path.isdir(os.path.join(parent_dir, d))
-                ]
-                if matching_dirs:
-                    # 取第一个匹配项（可按需调整排序逻辑，例如按时间排序）
-                    return os.path.join(parent_dir, matching_dirs[0])
-                return None
-            # 基础模型目录
-            self.BASE_MODEL_DIR = _find_base_model_dir(self.BASE_VERSION)
-        else:
-            self.BASE_MODEL_DIR = None
-        # 从 BASE_MODEL_DIR 解析基础网络类型 (例如从 ".../EXP_02_ResNet_Base" 中提取 "ResNet")
-        if self.BASE_MODEL_DIR:
-            dir_name = os.path.basename(self.BASE_MODEL_DIR)
-            parts = dir_name.split('_')
-            # 假设目录命名格式为 EXP_{version}_{NetType}_{Description}
-            if len(parts) >= 3:
-                net_type_str = parts[2]
-                # 尝试匹配 NetworkType 枚举，防止大小写或命名不一致
-                try:
-                    self.BASE_NET_TYPE = NetworkType(net_type_str)
-                except ValueError:
-                    # 如果直接匹配失败，尝试不区分大小写或常见变体匹配（可选增强鲁棒性）
-                    for member in NetworkType:
-                        if member.value.lower() == net_type_str.lower():
-                            self.BASE_NET_TYPE = member
-                            break
-                    else:
-                        # 若仍未找到，默认使用 ResNet 或抛出警告/设为 None，此处设为 None 并打印警告
-                        print(f"Warning: 无法识别的基础网络类型 '{net_type_str}'，源自目录 '{dir_name}'")
-                        self.BASE_NET_TYPE = None
-            else:
-                print(f"Warning: 基础模型目录名称格式不符合预期: '{dir_name}'")
-                self.BASE_NET_TYPE = None
-        else:
-            self.BASE_NET_TYPE = None
-        # 生成模型路径
-        # 仅当提供了参数时，才生成实验名称和目录
-        if 'exp_name' in kwargs:
-            self.EXP_NAME = kwargs['exp_name']
-        else:
-            self.EXP_NAME = generate_experiment_name(
-                self.NET_TYPE,
-                self.EXP_DESCRIPTION,
-                base_version=self.BASE_VERSION
-            )
+        # ===== 实验目录 =====
+        path = self.path_manager.get_exp_paths(self.info)
         # 获取实验模型路径
-        self.MODEL_DIR, self.MODEL_WEIGHTS_DIR, self.MODEL_EVAL_DIR = get_experiment_dir(self.EXP_NAME)
+        self.MODEL_DIR = path["root"]
+        self.MODEL_WEIGHTS_DIR = path["weights"]
+        self.MODEL_EVAL_DIR = path["eval"]
 
         # 新生成数据集文件路径
-        if self.PREPROCESS_TYPE == PreprocessType.STFT or PreprocessType.IQ:
-            self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}.h5"
-        elif self.PREPROCESS_TYPE == PreprocessType.WST:
-            self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}_j{self.WST_J}q{self.WST_Q}.h5"
+        if self.preprocess_type == PreprocessType.STFT:
+            self.filename_train_prepared_data = f"train_data_{self.preprocess_type.value}.h5"
+        elif self.preprocess_type == PreprocessType.WST:
+            self.filename_train_prepared_data = f"train_data_{self.preprocess_type.value}_j{self.WST_J}q{self.WST_Q}.h5"
 
         # PCA 相关的路径 (仅在需要时使用)
-        if self.IS_PCA_TRAIN:
-            self.PCA_DATA_DIR = os.path.join(self.MODEL_WEIGHTS_DIR, "pca_results")
-            self.PCA_FILE_INPUT = os.path.join(self.PCA_DATA_DIR, "teacher_feats.npz")
-            self.PCA_FILE_OUTPUT = os.path.join(self.PCA_DATA_DIR, f"pca_{self.PCA_DIM_TEST}.npz")
+        if self.is_pca_train:
+            self.PCA_DATA_DIR = path["pca_dir"]
+            self.PCA_FILE_INPUT = path["pca_input"]
+            self.PCA_FILE_OUTPUT = path["pca_output"](self.PCA_DIM_TEST)
         else:
             self.PCA_DATA_DIR = None
             self.PCA_FILE_INPUT = None
@@ -210,8 +135,11 @@ class Config:
             # 6. 基本类型直接返回
             return obj
 
+        # 需要排除的非序列化属性
+        excluded_keys = {'path_manager', 'info', 'base_info'}
+
         # 遍历实例的所有属性并序列化
-        return {k: _serialize(v) for k, v in self.__dict__.items()}
+        return {k: _serialize(v) for k, v in self.__dict__.items() if k not in excluded_keys}
 
     def save_to_json(self):
         """保存配置到实验目录"""
@@ -249,9 +177,9 @@ class Config:
         kwargs['is_pca_train'] = data.get('IS_PCA_TRAIN', True)
         kwargs['is_pca_test'] = data.get('IS_PCA_TEST', True)
 
-
         # 重新初始化对象
-        return cls(mode, net_type=net_type, **kwargs)
+        return cls(mode=mode, net_type=net_type, **kwargs)
+
 
 def set_seed(seed=42):
     """设置随机种子以确保实验可重现性"""
@@ -262,3 +190,7 @@ def set_seed(seed=42):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+if __name__ == '__main__':
+    cfg = Config(mode=Mode.TRAIN, NET_TYPE=NetworkType.ResNet)

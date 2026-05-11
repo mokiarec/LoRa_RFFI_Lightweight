@@ -1,333 +1,164 @@
-# paths.py
 import re
 from pathlib import Path
-from typing import Optional, Dict, Any
-
-# 项目根目录
-PROJECT_ROOT = Path(__file__).parent.absolute()
-
-# 检查点根目录 (新的统一目录结构)
-CHECKPOINTS_DIR = PROJECT_ROOT / "checkpoints"
-
-# 论文结果路径
-PAPER_DIR = PROJECT_ROOT / "paper"
-PAPER_RESULTS_DIR = PAPER_DIR / "results"
-PAPER_FIGURES_DIR = PAPER_DIR / "figures"
-
-# 确保目录存在
-for directory in [CHECKPOINTS_DIR, PAPER_DIR, PAPER_RESULTS_DIR, PAPER_FIGURES_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
-
-
-# ============================================================================
-# 实验命名系统 - 版本树架构
-# ============================================================================
-#
-# 命名格式：EXP_XX_NETTYPE_vYY_Description
-#
-# 示例：
-#   EXP_01_RESNET_Base              # 第一个基础实验
-#   EXP_02_LIGHTNET_Base            # 第二个基础实验
-#   EXP_03_RESNET_v01_Pruning       # 基于 EXP_01 的剪枝实验
-#   EXP_04_RESNET_v01_FineTune      # 基于 EXP_01 的微调实验
-#   EXP_05_LIGHTNET_v02_KD          # 基于 EXP_02 的知识蒸馏
-#   EXP_06_RESNET_v03_NewData       # 基于 EXP_03 的新数据实验
-#
-# 继承关系树：
-#   EXP_01 (Base)
-#   ├── EXP_03 (v01 - Pruning)
-#   │   └── EXP_06 (v03 - NewData)
-#   ├── EXP_04 (v01 - FineTune)
-#   EXP_02 (Base)
-#   └── EXP_05 (v02 - KD)
-# ============================================================================
-
-
-def get_next_experiment_number() -> int:
-    """
-    自动获取下一个实验序号
-
-    Returns:
-        int: 下一个实验序号 (从 1 开始)
-    """
-    if not CHECKPOINTS_DIR.exists():
-        return 1
-
-    # 查找所有符合 EXP_XX_* 格式的目录
-    pattern = re.compile(r'^EXP_(\d+)_.*')
-    max_num = 0
-
-    for item in CHECKPOINTS_DIR.iterdir():
-        if item.is_dir():
-            match = pattern.match(item.name)
-            if match:
-                num = int(match.group(1))
-                max_num = max(max_num, num)
-
-    return max_num + 1
-
-
-def generate_experiment_name(
-        net_type,
-        description: str,
-        base_version: Optional[str] = None
-) -> str:
-    """
-    自动生成实验名称（支持版本继承关系）
-
-    Args:
-        net_type: 网络类型枚举 (如 NetworkType.ResNet)
-        description: 实验描述 (如 "Base", "Pruning", "FineTune", "KD_PCA16")
-        base_version: 基础版本号 (可选)
-            - None: 表示这是一个独立的基础实验
-            - "01": 表示基于 EXP_01 发展而来
-            - "02": 表示基于 EXP_02 发展而来
-
-    Returns:
-        str: 完整的实验名称
-
-    Examples:
-        >>> # 创建基础实验
-        >>> generate_experiment_name(NetworkType.ResNet, "Base")
-        "EXP_01_RESNET_Base"
-
-        >>> # 创建基于 EXP_01 的剪枝实验
-        >>> generate_experiment_name(NetworkType.ResNet, "Pruning", base_version="01")
-        "EXP_03_RESNET_v01_Pruning"
-
-        >>> # 创建基于 EXP_01 的微调实验
-        >>> generate_experiment_name(NetworkType.ResNet, "FineTune", base_version="01")
-        "EXP_04_RESNET_v01_FineTune"
-
-        >>> # 创建基于 EXP_02 的知识蒸馏实验
-        >>> generate_experiment_name(NetworkType.LightNet, "KD_PCA16", base_version="02")
-        "EXP_05_LIGHTNET_v02_KD_PCA16"
-    """
-    next_num = get_next_experiment_number()
-
-    # 构建实验名称
-    if base_version:
-        # 扩展实验格式：EXP_XX_NETTYPE_vYY_Description
-        exp_name = f"EXP_{next_num:02d}_{net_type.value}_v{base_version}_{description}"
-    else:
-        # 基础实验格式：EXP_XX_NETTYPE_Description
-        exp_name = f"EXP_{next_num:02d}_{net_type.value}_{description}"
-
-    return exp_name
+from typing import Optional, Dict, List, Tuple
 
 
 class ExperimentInfo:
-    """实验信息类，用于解析和存储实验元数据"""
+    """实验信息模型，负责实验元数据的逻辑处理"""
 
-    def __init__(self, experiment_name: str):
-        """
-        解析实验名称并提取元数据
+    def __init__(self, exp_number: int, net_type: str, description: str,
+                 base_version: Optional[str] = None):
+        self.exp_number = exp_number
+        self.net_type = net_type
+        self.description = description
+        self.base_version = base_version  # 如 "01", "02"
+        self.is_extension = base_version is not None
 
-        Args:
-            experiment_name: 实验名称，如 "EXP_05_LIGHTNET_v02_KD_PCA16"
-        """
-        self.original_name = experiment_name
-        self.exp_number: Optional[int] = None
-        self.net_type: Optional[str] = None
-        self.base_version: Optional[str] = None
-        self.description: Optional[str] = None
-        self.is_extension: bool = False
+    @classmethod
+    def from_name(cls, experiment_name: str) -> 'ExperimentInfo':
+        """从实验名称字符串（或日志记录）解析并重建对象"""
+        # 匹配 EXP_05_LIGHTNET_v02_KD_PCA16 或 EXP_01_RESNET_Base
+        pattern = re.compile(r'^EXP_(\d+)_([A-Za-z0-9]+)_(?:v(\d+)_)?(.+)$')
+        match = pattern.match(experiment_name)
 
-        self._parse_name(experiment_name)
+        if not match:
+            raise ValueError(f"无效的实验名称格式: {experiment_name}")
 
-    def _parse_name(self, experiment_name: str) -> None:
-        """解析实验名称"""
-        # 匹配扩展实验格式：EXP_XX_NETTYPE_vYY_Description
-        pattern_ext = re.compile(r'^EXP_(\d+)_(.+?)_v(\d+)_(.+)$')
-        # 匹配基础实验格式：EXP_XX_NETTYPE_Description
-        pattern_base = re.compile(r'^EXP_(\d+)_(.+)_(.+)$')
+        exp_num = int(match.group(1))
+        net_type = match.group(2)
+        base_ver = match.group(3)  # 如果没有 vXX，则为 None
+        desc = match.group(4)
 
-        match = pattern_ext.match(experiment_name)
-        if match:
-            self.exp_number = int(match.group(1))
-            self.net_type = match.group(2)
-            self.base_version = match.group(3)
-            self.description = match.group(4)
-            self.is_extension = True
-            return
+        return cls(exp_num, net_type, desc, base_ver)
 
-        match = pattern_base.match(experiment_name)
-        if match:
-            self.exp_number = int(match.group(1))
-            self.net_type = match.group(2)
-            self.base_version = None
-            self.description = match.group(3)
-            self.is_extension = False
-            return
-
-        raise ValueError(f"无法解析实验名称：{experiment_name}")
-
-    def get_base_experiment_number(self) -> Optional[int]:
-        """获取基础实验编号"""
-        if self.base_version:
-            return int(self.base_version)
-        return None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
-        return {
-            'exp_number': self.exp_number,
-            'net_type': self.net_type,
-            'base_version': self.base_version,
-            'description': self.description,
-            'is_extension': self.is_extension,
-            'base_exp_number': self.get_base_experiment_number()
-        }
-
-    def __str__(self) -> str:
-        """字符串表示"""
+    @property
+    def name(self) -> str:
+        """生成标准化的实验文件夹名称"""
         if self.is_extension:
-            return f"EXP_{self.exp_number:02d} ({self.net_type}) <- v{self.base_version}: {self.description}"
-        else:
-            return f"EXP_{self.exp_number:02d} ({self.net_type}): {self.description}"
+            return f"EXP_{self.exp_number:02d}_{self.net_type}_v{self.base_version}_{self.description}"
+        return f"EXP_{self.exp_number:02d}_{self.net_type}_{self.description}"
 
-    def __repr__(self) -> str:
-        return f"ExperimentInfo('{self.original_name}')"
+    def get_base_exp_number(self) -> Optional[int]:
+        """获取父实验的数字编号"""
+        return int(self.base_version) if self.base_version else None
 
-
-def parse_experiment_name(experiment_name: str) -> ExperimentInfo:
-    """
-    解析实验名称，返回 ExperimentInfo 对象
-
-    Args:
-        experiment_name: 实验名称
-
-    Returns:
-        ExperimentInfo: 包含实验元数据的对象
-
-    Examples:
-        >>> info = parse_experiment_name("EXP_05_LIGHTNET_v02_KD_PCA16")
-        >>> info.exp_number
-        5
-        >>> info.net_type
-        'LIGHTNET'
-        >>> info.base_version
-        '02'
-        >>> info.is_extension
-        True
-        >>> info.get_base_experiment_number()
-        2
-    """
-    return ExperimentInfo(experiment_name)
+    def __str__(self):
+        rel = f" <- Base: {self.base_version}" if self.is_extension else " (Base)"
+        return f"[{self.exp_number:02d}] {self.net_type}{rel} | {self.description}"
 
 
-def get_base_experiment_dir(experiment_name: str) -> Optional[Path]:
-    """
-    根据实验名称获取其基础实验目录
+class PathManager:
+    """路径管理类，负责物理路径的生成与管理"""
 
-    Args:
-        experiment_name: 实验名称，如 "EXP_05_LIGHTNET_v02_KD"
+    def __init__(self, project_root: Optional[str] = None):
+        # 基础根目录设置
+        self.root = Path(project_root).absolute() if project_root else Path(__file__).parent.absolute()
+        self.checkpoints_dir = self.root / "checkpoints"
 
-    Returns:
-        Path|None: 基础实验目录路径，如果该实验不是扩展实验则返回 None
+        # 论文相关路径
+        self.paper_dir = self.root / "paper"
+        self.paper_results = self.paper_dir / "results"
+        self.paper_figures = self.paper_dir / "figures"
 
-    Examples:
-        >>> get_base_experiment_dir("EXP_05_LIGHTNET_v02_KD")
-        PosixPath('D:/.../checkpoints/experiments/EXP_02_...')
+        self._ensure_dirs()
 
-        >>> get_base_experiment_dir("EXP_01_RESNET_Base")
-        None
-    """
-    try:
-        exp_info = parse_experiment_name(experiment_name)
-    except ValueError:
-        return None
+    # 预定义论文输出文件映射
+    def get_paper_output_files(self):
+        paper_files = {
+            'model_statistics': self.paper_results / "model_statistics.csv",
+            'channel_robustness': self.paper_results / "channel_robustness_comparison.pdf",
+            'mobility_robustness': self.paper_results / "mobility_robustness.pdf",
+            'accuracy_heatmap': self.paper_results / "accuracy_heatmap_conditions.pdf",
+            'detailed_accuracy_heatmap': self.paper_results / "detailed_accuracy_heatmap.pdf",
+            'pca_ablation': self.paper_results / "pca_ablation_scenario_based.pdf",
+            'pca_origin_pca': self.paper_results / "comparison_origin_pca.pdf",
+        }
+        return paper_files
 
-    if not exp_info.is_extension or not exp_info.base_version:
-        return None
+    def _ensure_dirs(self):
+        """初始化时自动创建核心目录"""
+        for d in [self.checkpoints_dir, self.paper_results, self.paper_figures]:
+            d.mkdir(parents=True, exist_ok=True)
 
-    # 查找基础实验目录
-    base_num = exp_info.get_base_experiment_number()
-    pattern = re.compile(f'^EXP_{base_num:02d}_.*')
+    # --- 实验管理功能 ---
 
-    for item in CHECKPOINTS_DIR.iterdir():
-        if item.is_dir() and pattern.match(item.name):
-            return item
+    def create_experiment(self, net_type_val: str, description: str,
+                          base_exp_num: Optional[int] = None) -> ExperimentInfo:
+        """创建一个全新的实验对象并分配下一个可用序号"""
+        next_num = self._get_next_num()
+        base_ver = f"{base_exp_num:02d}" if base_exp_num is not None else None
 
-    return None
+        return ExperimentInfo(next_num, net_type_val, description, base_ver)
 
+    def _get_next_num(self) -> int:
+        """扫描目录获取下一个实验 ID"""
+        existing_nums = [
+            int(m.group(1)) for d in self.checkpoints_dir.iterdir()
+            if d.is_dir() and (m := re.match(r'^EXP_(\d+)_', d.name))
+        ]
+        return max(existing_nums, default=0) + 1
 
-def get_experiment_lineage(experiment_name: str) -> list:
-    """
-    获取实验的完整继承链（从根到当前）
+    def get_exp_paths(self, exp: ExperimentInfo) -> Dict[str, Path]:
+        """为给定实验生成完整的路径束"""
+        exp_root = self.checkpoints_dir / exp.name
+        weights_dir = exp_root / "weights"
 
-    Args:
-        experiment_name: 实验名称
+        # 自动生成 PCA 路径
+        pca_dir = weights_dir / "pca_results"
 
-    Returns:
-        list: 实验名称列表，按继承顺序排列
+        paths = {
+            "root": exp_root,
+            "weights": weights_dir,
+            "eval": exp_root / "eval",
+            "pca_dir": pca_dir,
+            "pca_input": pca_dir / "teacher_feats.npz",
+            "pca_output": lambda dim: pca_dir / f"pca_{dim}.npz",  # 支持动态维度
+            "Extractor_best": weights_dir / "Extractor_best.pth",
+        }
+        return paths
 
-    Examples:
-        >>> get_experiment_lineage("EXP_06_RESNET_v03_NewData")
-        ['EXP_01_RESNET_Base', 'EXP_03_RESNET_v01_Pruning', 'EXP_06_RESNET_v03_NewData']
-    """
-    lineage = []
-    current_name = experiment_name
+    def find_base_exp_path(self, exp: ExperimentInfo) -> Optional[Path]:
+        """根据当前实验信息，抓取其 Base 实验的名称字符串"""
+        base_num = exp.get_base_exp_number()
+        if base_num is None:
+            return None
 
-    while True:
-        lineage.insert(0, current_name)
+        pattern = f"EXP_{base_num:02d}_*"
+        matches = list(self.checkpoints_dir.glob(pattern))
+        return matches[0] if matches else None
 
-        try:
-            exp_info = parse_experiment_name(current_name)
-        except ValueError:
-            break
+    def get_lineage_infos(self, exp_name: str) -> List[ExperimentInfo]:
+        """从日志中的实验名开始，向上回溯完整的继承链对象"""
+        lineage = []
+        curr_name = exp_name
 
-        if not exp_info.is_extension or not exp_info.base_version:
-            break
+        while curr_name:
+            info = ExperimentInfo.from_name(curr_name)
+            lineage.insert(0, info)
 
-        # 查找父实验
-        base_num = exp_info.get_base_experiment_number()
-        pattern = re.compile(f'^EXP_{base_num:02d}_.*')
+            base_dir = self.find_base_exp_dir(info)
+            curr_name = base_dir.name if base_dir else None
 
-        parent_found = False
-        for item in CHECKPOINTS_DIR.iterdir():
-            if item.is_dir() and pattern.match(item.name):
-                current_name = item.name
-                parent_found = True
-                break
+        return lineage
 
-        if not parent_found:
-            break
+if __name__ == '__main__':
+    pm = PathManager()
 
-    return lineage
+    # 情况 A：从日志中恢复实验并查找其父实验
+    log_exp_name = "EXP_05_LIGHTNET_v02_KD_PCA16"
+    info = ExperimentInfo.from_name(log_exp_name)
+    print(f"当前实验: {info}")
+    # 输出: [05] LIGHTNET <- Base: 02 | KD_PCA16
 
+    base_path = pm.find_base_exp_path(info)
+    print(f"父实验路径: {base_path}")
 
-def get_experiment_dir(experiment_name):
-    """
-    获取实验检查点目录
+    # 情况 B：创建一个新的继承实验
+    new_exp = pm.create_experiment("ResNet", "KD_PCA8", base_exp_num=1)
+    paths = pm.get_exp_paths(new_exp)
 
-    Args:
-        experiment_name: 实验名称，如 "EXP_01_KD_PCA16"
+    print(f"新实验目录: {paths['root']}")
+    print(f"PCA 输出路径: {paths['pca_output'](16)}")
 
-    Returns:
-        Path: 实验检查点目录路径
-
-    Example:
-        >>> get_experiment_dir("EXP_01_KD_PCA16")
-        checkpoints/experiments/EXP_01_KD_PCA16
-    """
-    if experiment_name is not None:
-        model_dir = CHECKPOINTS_DIR / experiment_name
-        weights_dir = model_dir / "weights"
-        eval_dir = model_dir / "eval"
-
-        return model_dir, weights_dir, eval_dir
-    else:
-        return CHECKPOINTS_DIR
-
-
-# 论文输出文件路径
-PAPER_OUTPUT_FILES = {
-    'model_statistics': PAPER_RESULTS_DIR / "model_statistics.csv",
-    'channel_robustness': PAPER_FIGURES_DIR / "channel_robustness_comparison.pdf",
-    'mobility_robustness': PAPER_FIGURES_DIR / "mobility_robustness.pdf",
-    'accuracy_heatmap': PAPER_FIGURES_DIR / "accuracy_heatmap_conditions.pdf",
-    'detailed_accuracy_heatmap': PAPER_FIGURES_DIR / "detailed_accuracy_heatmap.pdf",
-    'pca_ablation': PAPER_FIGURES_DIR / "pca_ablation_scenario_based.pdf",
-    'pca_origin_pca': PAPER_FIGURES_DIR / "comparison_origin_pca.pdf",
-}
+    # 情况 C：访问静态论文路径
+    print(f"论文图表目录: {pm.paper_figures}")

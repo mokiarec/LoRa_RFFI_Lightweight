@@ -25,9 +25,9 @@ class ResBlock(nn.Module):
 
 
 # 特征提取模型
-class FeatureExtractor(nn.Module):
+class ResNet(nn.Module):
     def __init__(self, in_channels):
-        super(FeatureExtractor, self).__init__()
+        super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=7, stride=2, padding=3)
         self.layer1 = ResBlock(32, 32)
         self.layer2 = ResBlock(32, 32)
@@ -36,6 +36,29 @@ class FeatureExtractor(nn.Module):
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
         self.fc = nn.Linear(64, 512)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.pool(x)
+        x = self.flatten(x)
+        x = F.normalize(self.fc(x), p=2, dim=1)  # L2 正则化
+        return x
+
+class ResNet_prune(nn.Module):
+    def __init__(self, in_channels):
+        super(ResNet_prune, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, 8, kernel_size=7, stride=2, padding=3)
+        self.layer1 = ResBlock(8, 4, first_layer=True)
+        self.layer2 = ResBlock(4, 8, first_layer=True)
+        self.layer3 = ResBlock(8, 12, first_layer=True)
+        self.layer4 = ResBlock(12, 16, first_layer=True)
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(16, 8)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))

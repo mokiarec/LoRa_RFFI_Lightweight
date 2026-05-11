@@ -1,7 +1,7 @@
 # 模型加载函数
 import torch
 
-from net.TripletNet import TripletNet
+from net import TripletNet
 
 
 def load_model(file_path, net_type, generate_type, weights_only=True):

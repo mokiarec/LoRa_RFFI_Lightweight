@@ -6,10 +6,9 @@ from sklearn.decomposition import PCA
 from torch.utils.data import DataLoader
 
 from core.config import Config, DEVICE, Mode, PreprocessType
-from net.TripletNet import TripletNet
-from core.config import NetworkType
-from training_utils.TripletDataset import TripletDataset
-from training_utils.data_preprocessor import prepare_train_data
+from net import NetworkType, TripletNet
+from utils.TripletDataset import TripletDataset
+from utils.data_preprocessor import prepare_train_data
 
 
 def pca_extract_features(
@@ -35,8 +34,8 @@ def pca_extract_features(
     """
 
     # 生成数据加载器
-    dataset = TripletDataset(data, labels)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataset = TripletDataset(data, labels, preprocess_type)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     teacher_model = TripletNet(net_type=teacher_net_type, in_channels=preprocess_type.in_channels)  # MobileNet
     teacher_model.load_state_dict(torch.load(model_path))
     teacher_model.to(DEVICE)
@@ -168,7 +167,7 @@ if __name__ == '__main__':
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
-        generate_type=config.PREPROCESS_TYPE,
+        generate_type=config.preprocess_type,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )

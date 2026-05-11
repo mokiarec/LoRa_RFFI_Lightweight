@@ -8,6 +8,8 @@ import scipy.signal as signal
 from kymatio import Scattering1D
 from tqdm import tqdm
 
+from core.config import PreprocessType
+
 
 # Additive White Gaussian Noise (AWGN) Function
 def awgn(data, snr_range):
@@ -38,7 +40,7 @@ class TimeFrequencyTransformer:
     """将时域信号转化为时频图，包括通道独立频谱图和小波散射频谱图的生成"""
 
     @staticmethod
-    def generate_stft_channel(data, win_len=256, overlap=128):
+    def generate_stft_channel(data, generate_type, win_len=256, overlap=128):
         """
         将一批IQ信号样本转换为通道独立频谱图。
 
@@ -83,12 +85,15 @@ class TimeFrequencyTransformer:
             # FFT shift to adjust the central frequency.
             spec = np.fft.fftshift(spec, axes=0)
 
-            # Generate channel independent spectrogram.
-            chan_ind_spec = spec[:, 1:] / spec[:, :-1]
-            # chan_ind_spec = spec
+            if generate_type == PreprocessType.STFT:
+                # Generate channel independent spectrogram.
+                chan_ind_spec = spec[:, 1:] / spec[:, :-1]
+                # chan_ind_spec = spec
 
-            # Take the logarithm of the magnitude.
-            chan_ind_spec_amp = np.log10(np.abs(chan_ind_spec) ** 2)
+                # Take the logarithm of the magnitude.
+                chan_ind_spec_amp = np.log10(np.abs(chan_ind_spec) ** 2)
+            elif generate_type == PreprocessType.IQ:
+                return spec
 
             """绘制结果，不要删除！！！"""
             # plt.figure(figsize=(8, 8))
@@ -117,22 +122,39 @@ class TimeFrequencyTransformer:
 
         # Normalize the IQ samples.
         data = _normalization(data)
-
-        # Calculate the size of channel independent spectrograms.
         num_sample = data.shape[0]
-        num_row = int(256 * 0.4)
-        num_column = int(np.floor((data.shape[1] - 256) / 128 + 1) - 1)
-        data_channel_ind_spec = np.zeros([num_sample, 1, num_row, num_column])
 
-        # Convert each packet (IQ samples) to a channel independent spectrogram.
-        for i in tqdm(range(num_sample)):
-            chan_ind_spec_amp = _gen_single_channel_ind_spectrogram(
-                data[i], win_len, overlap
-            )
-            chan_ind_spec_amp = _spec_crop(chan_ind_spec_amp)
-            data_channel_ind_spec[i, 0, :, :] = chan_ind_spec_amp
+        if generate_type == PreprocessType.STFT:
+            # Calculate the size of channel independent spectrograms.
+            num_row = int(256 * 0.4)
+            num_column = int(np.floor((data.shape[1] - 256) / 128 + 1) - 1)
+            data_channel_ind_spec = np.zeros([num_sample, 1, num_row, num_column])
 
-        return data_channel_ind_spec
+            # Convert each packet (IQ samples) to a channel independent spectrogram.
+            for i in tqdm(range(num_sample)):
+                chan_ind_spec_amp = _gen_single_channel_ind_spectrogram(data[i], win_len, overlap)
+                chan_ind_spec_amp = _spec_crop(chan_ind_spec_amp)
+                data_channel_ind_spec[i, 0, :, :] = chan_ind_spec_amp
+
+            return data_channel_ind_spec
+
+        elif generate_type == PreprocessType.IQ:
+            # 3. 处理第一个样本以获取准确的形状
+            sample_output = _gen_single_channel_ind_spectrogram(data[0], win_len, overlap)
+            sample_output = _spec_crop(sample_output)
+
+            actual_row, actual_col = sample_output.shape
+
+            # 初始化容器 (N, 1, H, W)
+            data_channel_ind_spec = np.zeros([num_sample, 1, actual_row, actual_col], dtype=np.complex64)
+
+            # 循环处理
+            for i in tqdm(range(num_sample)):
+                spec_result = _gen_single_channel_ind_spectrogram(data[i], win_len, overlap)
+                spec_result = _spec_crop(spec_result)
+                data_channel_ind_spec[i, 0, :, :] = spec_result
+
+            return data_channel_ind_spec
 
     @staticmethod
     def generate_WST(data, J=6, Q=6):

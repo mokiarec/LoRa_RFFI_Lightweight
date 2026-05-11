@@ -3,14 +3,17 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+from core.config import PreprocessType
+
 
 # 自定义Dataset类，用于三元组生成
 # 更新后的 TripletDataset 类
 class TripletDataset(Dataset):
-    def __init__(self, data, labels):
+    def __init__(self, data, labels, preprocess_type):
         self.data = data
         self.labels = labels
         self.dev_range = np.unique(labels)
+        self.preprocess_type = preprocess_type
 
     def __len__(self):
         return len(self.labels)
@@ -33,11 +36,19 @@ class TripletDataset(Dataset):
         negative = self.data[negative_idx]
 
         # 返回 anchor, positive, negative 样本
-        return (
-            torch.tensor(anchor, dtype=torch.float32),
-            torch.tensor(positive, dtype=torch.float32),
-            torch.tensor(negative, dtype=torch.float32),
-        )
+        if self.preprocess_type == PreprocessType.STFT:
+            return (
+                torch.tensor(anchor, dtype=torch.float32),
+                torch.tensor(positive, dtype=torch.float32),
+                torch.tensor(negative, dtype=torch.float32),
+            )
+        elif self.preprocess_type == PreprocessType.IQ:
+            return (
+                self._to_complex_tensor(anchor),
+                self._to_complex_tensor(positive),
+                self._to_complex_tensor(negative),
+            )
+        return None
 
 
 # 三元组损失函数

@@ -11,7 +11,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from core.config import Config, DEVICE
-from training_utils.data_preprocessor import load_generate_triplet, load_model
+from utils.data_preprocessor import load_generate_triplet, load_model
 from utils.FLOPs import calculate_flops_and_params
 
 
@@ -52,12 +52,12 @@ def test_latency_benchmark(
     print("Data loading...")
     label_enrol, triplet_data_enrol = load_generate_triplet(
         file_path_enrol, dev_range_enrol, pkt_range_enrol,
-        config.PREPROCESS_TYPE, snr_range=snr_range
+        config.preprocess_type, snr_range=snr_range
     )
 
     label_clf, triplet_data_clf = load_generate_triplet(
         file_path_clf, dev_range_clf, pkt_range_clf,
-        config.PREPROCESS_TYPE, snr_range=snr_range
+        config.preprocess_type, snr_range=snr_range
     )
     print("Data loaded!!!\n")
 
@@ -87,7 +87,7 @@ def test_latency_benchmark(
             continue
 
         # 加载模型
-        model = load_model(model_path, config.NET_TYPE, config.PREPROCESS_TYPE)
+        model = load_model(model_path, config.net_type, config.preprocess_type)
         model.to(DEVICE)
         model.eval()
         print("Model loaded!!!\n")

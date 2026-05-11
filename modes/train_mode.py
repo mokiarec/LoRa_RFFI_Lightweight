@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 # 从配置模块导入设备
-from core.config import DEVICE
-from net.TripletNet import TripletNet
+from core.config import DEVICE, PreprocessType
+from net import TripletNet
 from plot.plot_loss import plot_loss_curve
-from training_utils.TripletDataset import TripletDataset, TripletLoss
+from utils.TripletDataset import TripletDataset, TripletLoss
 
 
 def train(config, data, labels, batch_size, num_epochs, learning_rate):
@@ -39,7 +39,7 @@ def train(config, data, labels, batch_size, num_epochs, learning_rate):
 
     try:
         import swanlab
-        SWANLAB_AVAILABLE = True
+        SWANLAB_AVAILABLE = not config.disable_swanlab
     except ImportError:
         SWANLAB_AVAILABLE = False
 
@@ -49,16 +49,19 @@ def train(config, data, labels, batch_size, num_epochs, learning_rate):
     )
 
     # 生成数据加载器
-    train_dataset = TripletDataset(data_train, labels_train)
+    train_dataset = TripletDataset(data_train, labels_train, config.preprocess_type)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 准备验证集数据 (转换为 tensor)
-    valid_data_tensor = torch.tensor(data_valid, dtype=torch.float32).to(DEVICE)
     valid_labels_tensor = torch.tensor(labels_valid, dtype=torch.long).to(DEVICE)
+    if config.preprocess_type == PreprocessType.STFT:
+        valid_data_tensor = torch.tensor(data_valid, dtype=torch.float32).to(DEVICE)
+    elif config.preprocess_type == PreprocessType.IQ:
+        valid_data_tensor = torch.from_numpy(data_valid).to(torch.complex64).to(DEVICE)
 
     # 初始化模型和优化器
-    model = TripletNet(net_type=config.NET_TYPE, in_channels=config.PREPROCESS_TYPE.in_channels)
+    model = TripletNet(net_type=config.net_type, in_channels=config.preprocess_type.in_channels)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
@@ -180,7 +183,7 @@ def train(config, data, labels, batch_size, num_epochs, learning_rate):
                 }, step=epoch + 1)
 
             # 保存固定checkpoint的模型
-            if config.TEST_LIST and (epoch + 1) in config.TEST_LIST:
+            if config.test_list and (epoch + 1) in config.test_list:
                 # 保存模型到指定路径
                 file_name = f"Extractor_{epoch + 1}.pth"
                 file_path = os.path.join(config.MODEL_WEIGHTS_DIR, file_name)
@@ -188,9 +191,9 @@ def train(config, data, labels, batch_size, num_epochs, learning_rate):
                 tqdm.write(f"Model saved to {file_path}")
 
                 # 绘制loss折线图
-                if config.TEST_LIST and (epoch + 1) in config.TEST_LIST[-3:]:
+                if config.test_list and (epoch + 1) in config.test_list[-3:]:
                     pic_save_path = os.path.join(config.MODEL_WEIGHTS_DIR, f"loss_{epoch+1}.png")
-                    plot_loss_curve(loss_per_epoch, num_epochs, config.NET_TYPE, config.PREPROCESS_TYPE, pic_save_path)
+                    plot_loss_curve(loss_per_epoch, num_epochs, config.net_type, config.preprocess_type, pic_save_path)
 
 
     # 打印最佳模型信息

@@ -7,21 +7,18 @@ import numpy as np
 import torch
 
 from core.config import PreprocessType
-from net.TripletNet import TripletNet
-from training_utils.data_loader import LoadDataset
+from net import TripletNet
+from utils.data_loader import LoadDataset
 from utils.signal_trans import TimeFrequencyTransformer, awgn
 
 
 def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
     """
     数据预处理方式选择
-
-    - PREPROCESS_TYPE : 0 信道独立的STFT
-    - PREPROCESS_TYPE : 1 小波散射变换
     """
     # TF_Transformer = TimeFrequencyTransformer()
-    if generate_type == PreprocessType.STFT:
-        data = TimeFrequencyTransformer.generate_stft_channel(data)
+    if generate_type == PreprocessType.STFT or PreprocessType.IQ:
+        data = TimeFrequencyTransformer.generate_stft_channel(data, generate_type)
     if generate_type == PreprocessType.WST:
         data = TimeFrequencyTransformer.generate_WST(data, J=wst_j, Q=wst_q)
     return data
@@ -88,11 +85,10 @@ def prepare_train_data(
         print("Data Converting...")
 
         data, labels = load_data(path_train_data, dev_range, pkt_range)
-        if generate_type != PreprocessType.IQ and snr_range is not None:
+        if snr_range is not None:
             data = awgn(data, snr_range)
 
-        if generate_type != PreprocessType.IQ:
-            data = generate_spectrogram(data, generate_type, WST_J, WST_Q)
+        data = generate_spectrogram(data, generate_type, WST_J, WST_Q)
 
         with h5py.File(filename_train_prepared_data, "w") as f:
             f.create_dataset("data", data=data)

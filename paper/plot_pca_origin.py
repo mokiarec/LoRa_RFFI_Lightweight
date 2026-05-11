@@ -2,7 +2,6 @@
 import os
 import sys
 
-import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
@@ -10,9 +9,12 @@ from sklearn.decomposition import PCA
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.config import PreprocessType, NetworkType
-from training_utils.data_preprocessor import load_generate_triplet, load_model
-from paths import DATASET_FILES, get_model_path, PAPER_OUTPUT_FILES
+from core.config import PreprocessType
+from net import NetworkType
+
+from utils.data_preprocessor import load_generate_triplet, load_model
+from dataset import *
+from paths import PAPER_OUTPUT_FILES
 
 # ================= 路径设置 =================
 PCA_ORIGIN_PLOT_PATH = PAPER_OUTPUT_FILES['pca_origin_pca']
@@ -24,6 +26,12 @@ def plot_pca_comparison(feats, n_components=16):
     # 执行PCA
     pca = PCA(n_components=min(n_components, feats.shape[1]))
     pca.fit(feats)
+    feats_compressed = pca.fit_transform(feats)
+    feats_reconstructed = pca.inverse_transform(feats_compressed)   # 重构原始数据
+    # 计算重构误差
+    reconstruction_error = np.mean((feats - feats_reconstructed) ** 2)
+    print(f"重构均方误差: {reconstruction_error}")
+
     # 原始特征方差
     feature_variances = np.asarray(feats).var(axis=0)
 
@@ -86,13 +94,20 @@ def plot_pca_comparison(feats, n_components=16):
     plt.show()
 
 if __name__ == '__main__':
-    file_path_enrol = str(DATASET_FILES['F_walk'])
-    dev_range_enrol = np.arange(31, 40, dtype=int)
-    pkt_range_enrol = np.arange(0, 100, dtype=int)
-    net_type = NetworkType.LightNet
-    # model_path = get_model_path(PreprocessType.STFT, net_type, 'origin/Extractor_200.pth')
-    model_path = get_model_path(PreprocessType.STFT, net_type, 'distillation/Extractor_200.pth')
+    # 修正数据集访问路径
+    file_path_enrol = str(DATASET['Test']['seen'].path)
+    # dev_range_enrol = DATASET['Test']['seen'].dev_range
+    # pkt_range_enrol = DATASET['Test']['seen'].pkt_range
+
+    # file_path_enrol = "D:\ScienceProject\LoRa_RFFI/dataset/DATA_all_dev_1~11_300times_433m_1M_3gain.h5"
+    dev_range_enrol = np.arange(0, 5)
+    pkt_range_enrol = np.arange(0, 100)
+    
+    net_type = NetworkType.ResNet
+    model_path = "D:\ScienceProject\LoRa_RFFI/checkpoints/EXP_02_ResNet_Base/weights/Extractor_best.pth"
+    # model_path = "D:\ScienceProject\LoRa_RFFI/model/stft/Drsn/origin/Extractor_300.pth"
     preprocess_type = PreprocessType.STFT
+    
     # 加载注册数据集(IQ样本和标签)
     print("\nData loading...")
     label_enrol, triplet_data_enrol = load_generate_triplet(
@@ -101,7 +116,18 @@ if __name__ == '__main__':
     )
 
     model = load_model(str(model_path), net_type, preprocess_type)
+    
+    # 将模型移动到正确的设备
+    from core.config import DEVICE
+    model = model.to(DEVICE)
+    
+    # 将数据移动到正确的设备
+    triplet_data_enrol = [data.to(DEVICE) for data in triplet_data_enrol]
 
     with torch.no_grad():
-        feature_enrol = model(*triplet_data_enrol)
-    plot_pca_comparison(feats=feature_enrol[0], n_components=32)
+        # 模型返回三元组特征 (anchor, positive, negative)
+        feature_anchor, feature_positive, feature_negative = model(*triplet_data_enrol)
+        # 使用 anchor 特征进行 PCA 分析
+        feature_enrol = feature_anchor.cpu().numpy()
+    
+    plot_pca_comparison(feats=feature_enrol, n_components=16)

@@ -8,7 +8,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 from core.config import Config
 from plot.plot_roc import evaluate_and_plot_roc
-from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
+from utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 
 def test_rogue_device_detection(
@@ -59,7 +59,7 @@ def test_rogue_device_detection(
     print("\nDevice enrolling...")
     # 加载注册数据集(IQ样本和标签)
     label_enrol, triplet_data_enrol = load_generate_triplet(
-        file_path_enrol, dev_range_enrol, pkt_range_enrol, config.PREPROCESS_TYPE
+        file_path_enrol, dev_range_enrol, pkt_range_enrol, config.preprocess_type
     )
 
     """
@@ -82,7 +82,7 @@ def test_rogue_device_detection(
     )
 
     # 提取特征
-    data_test = generate_spectrogram(data_test, config.PREPROCESS_TYPE, wst_j, wst_q)
+    data_test = generate_spectrogram(data_test, config.preprocess_type, wst_j, wst_q)
 
     # 准备三元组数据
     triplet_data_test = [
@@ -110,7 +110,7 @@ def test_rogue_device_detection(
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, config.NET_TYPE, config.PREPROCESS_TYPE)
+            model = load_model(model_path, config.net_type, config.preprocess_type)
             print("Model loaded!!!")
 
             """

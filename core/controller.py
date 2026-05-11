@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode
+from core.config import Config, Mode, PreprocessType
 from dataset import DATASET
 
 from modes import (
@@ -14,8 +14,9 @@ from modes import (
     test_rogue_device_detection,
     train,
 )
+from paths import PathManager
 
-from training_utils.data_preprocessor import prepare_train_data
+from utils.data_preprocessor import prepare_train_data
 from utils.PCA import pca_perform, pca_extract_features
 from utils.better_print import print_colored_text
 
@@ -47,10 +48,10 @@ def main(config: Config):
         raise ValueError(f"Unknown mode: {config.mode}")
 
 
-def run_train_mode(config):
+def run_train_mode(config: Config):
     """训练模式"""
     print_colored_text("训练模式", "32")
-    print(f"Convert Type: {config.PREPROCESS_TYPE.value}")
+    print(f"Convert Type: {config.preprocess_type.value}")
 
     data, labels = prepare_train_data(
         config.new_file_flag,
@@ -59,7 +60,7 @@ def run_train_mode(config):
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=config.HP['snr'],
-        generate_type=config.PREPROCESS_TYPE,
+        generate_type=config.preprocess_type,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )
@@ -72,7 +73,7 @@ def run_train_mode(config):
           )
 
 
-def run_classification_mode(config):
+def run_classification_mode(config: Config):
     """分类模式"""
     print_colored_text("分类模式", "32")
 
@@ -82,15 +83,18 @@ def run_classification_mode(config):
         dataset_name=DATASET['Train']['no_aug'].name,
         file_path_enrol=DATASET['Train']['no_aug'].path,
         file_path_clf=DATASET['Test']['seen'].path,
+        # dataset_name='test',
+        # file_path_enrol="./dataset/DATA_all_dev_1~11_499times_433m_1M_3gain.h5",
+        # file_path_clf="./dataset/DATA_all_dev_1~11_499times_433m_1M_3gain.h5",
         dev_range_enrol=np.arange(0, 40, dtype=int),
-        pkt_range_enrol=np.arange(0, 400, dtype=int),
+        pkt_range_enrol=np.arange(0, 200, dtype=int),
         dev_range_clf=np.arange(0, 40, dtype=int),
-        pkt_range_clf=np.arange(0, 200, dtype=int),
+        pkt_range_clf=np.arange(200, 400, dtype=int),
         is_pac=config.IS_PCA_TEST
     )
 
 
-def run_multi_clf_mode(config):
+def run_multi_clf_mode(config: Config):
     """多数据集分类评估模式"""
     print_colored_text("多数据集分类评估", "32")
 
@@ -98,7 +102,7 @@ def run_multi_clf_mode(config):
     test_multi_clf(config)
 
 
-def run_rogue_device_detection_mode(config):
+def run_rogue_device_detection_mode(config: Config):
     """甄别恶意模式"""
     print_colored_text("甄别恶意模式", "32")
 
@@ -120,16 +124,16 @@ def run_rogue_device_detection_mode(config):
     )
 
 
-def run_distillation_mode(config):
+def run_distillation_mode(config: Config):
     """蒸馏模式"""
 
     # 模型指定路径
-    file_name = f"Extractor_best.pth"
-    file_path = os.path.join(config.BASE_MODEL_DIR, "weights", file_name)
+    path_manager = PathManager()
+    file_path = path_manager.get_exp_paths(config.base_info)["Extractor_best"]
 
     print_colored_text("蒸馏训练模式", "32")
 
-    if config.IS_PCA_TRAIN:
+    if config.is_pca_train:
         data, labels = prepare_train_data(
             config.new_file_flag,
             config.filename_train_prepared_data,
@@ -137,7 +141,7 @@ def run_distillation_mode(config):
             dev_range=np.arange(0, 40, dtype=int),
             pkt_range=np.arange(0, 800, dtype=int),
             snr_range=config.HP['snr'],
-            generate_type=config.PREPROCESS_TYPE,
+            generate_type=config.preprocess_type,
             WST_J=config.WST_J,
             WST_Q=config.WST_Q,
         )
@@ -146,8 +150,8 @@ def run_distillation_mode(config):
         pca_extract_features(data, labels, batch_size=128,
                              model_path=file_path,
                              output_path=config.PCA_FILE_INPUT,
-                             teacher_net_type=config.BASE_NET_TYPE,
-                             preprocess_type=config.PREPROCESS_TYPE
+                             teacher_net_type=config.base_net_type,
+                             preprocess_type=PreprocessType.STFT
                              )
         # 执行 PCA
         pca_perform(
@@ -164,7 +168,7 @@ def run_distillation_mode(config):
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=config.HP['snr'],
-        generate_type=config.PREPROCESS_TYPE,
+        generate_type=config.preprocess_type,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )
@@ -180,7 +184,7 @@ def run_distillation_mode(config):
         learning_rate=config.HP['learning_rate'],
         temperature=config.HP['temperature'],
         alpha=config.HP['alpha'],
-        is_pca=config.IS_PCA_TRAIN,
+        is_pca=config.is_pca_train,
         pca_file_path=config.PCA_FILE_OUTPUT,
     )
 

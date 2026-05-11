@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from training_utils.TripletDataset import TripletLoss
+from utils.TripletDataset import TripletLoss
 from utils.WTConv import DepthwiseSeparableConvWithWTConv2d
 
 NET_TYPE = "net_wt_1"

@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     # ==================== 配置选择开关 ====================
     # 修改此变量来选择不同的实验配置
-    EXP_SELECT = 5
+    EXP_SELECT = 3
     EXP_resume = False
     EXP_id = None
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
             mode=Mode.TRAIN,
             base_net_type=NetworkType.ResNet,
             exp_description="Pruning",
-            base_version="01"  # 基于 EXP_01
+            base_version=1  # 基于 EXP_01
         )
 
     elif EXP_SELECT == 3:
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             net_type=NetworkType.ShuffleNet_prune,
             preprocess_type=PreprocessType.STFT,
             exp_description="KD_PCA8",
-            base_version="24",  # 基于 EXP_02
+            base_version=24,  # 基于 EXP_02
             # snr=np.arange(20, 80),
             is_pca_train=True,
         )
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     try:
         import swanlab
-        SWANLAB_AVAILABLE = True
+        SWANLAB_AVAILABLE = not config.disable_swanlab
     except ImportError:
         SWANLAB_AVAILABLE = False
         print("警告：未安装 swanlab，将跳过实验跟踪")
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     if SWANLAB_AVAILABLE:
         # 动态生成：例如 EXP_01_LightNet_Base_classification
         mode_name = config.mode.value if isinstance(config.mode, Mode) else str(config.mode)
-        current_exp_name = f"{config.EXP_NAME}"
+        current_exp_name = f"{config.info.name}"
         custom_logdir = os.path.join(config.MODEL_DIR, "swanlog")
         try:
             swanlab.login()
@@ -105,16 +105,16 @@ if __name__ == "__main__":
                 resume=EXP_resume,
                 id=EXP_id,
                 config={
-                    "network_type": config.NET_TYPE.value,
-                    "preprocess_type": config.PREPROCESS_TYPE.value,
+                    "network_type": config.net_type.value,
+                    "preprocess_type": config.preprocess_type.value,
                     "batch_size": config.HP['batch_size'],
                     "num_epochs": config.HP['num_epochs'],
                     "learning_rate": config.HP['learning_rate'],
                     "temperature": config.HP['temperature'],
                     "alpha": config.HP['alpha'],
                     "snr": config.HP['snr'],
-                    "pca_dim_train": config.PCA_DIM_TRAIN if config.IS_PCA_TRAIN else None,
-                    "test_list": config.TEST_LIST,
+                    "pca_dim_train": config.PCA_DIM_TRAIN if config.is_pca_train else None,
+                    "test_list": config.test_list,
                     "device": str(DEVICE),
                 },
                 logdir=custom_logdir

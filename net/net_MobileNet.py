@@ -246,7 +246,7 @@ class LightNet(nn.Module):
         # 展平层：将多维特征转换为一维向量
         self.flatten = nn.Flatten()
         # 全连接层：将特征映射到512维特征空间
-        self.fc = nn.Linear(int(1024*width_multiplier), 512)
+        self.fc = nn.Linear(int(1024*width_multiplier), 8)
 
     def forward(self, x):
         x = self.initial_conv(x)
@@ -257,7 +257,172 @@ class LightNet(nn.Module):
         x = F.normalize(self.fc(x), p=2.0, dim=1)  # L2 正则化
         return x
 
-def mobilenet(version, in_channels, width_multiplier=1.0):
+
+class LightNet_prune(nn.Module):
+    """轻量残差 MobileNetV1 特征提取器"""
+    def __init__(self, in_channels, width_multiplier=1.0):
+        super(LightNet_prune, self).__init__()
+        self.width_multiplier = width_multiplier
+
+        def conv_bn(inp, oup, stride):
+            '''标准卷积块：卷积 + 批归一化 + ReLU'''
+            return nn.Sequential(
+                nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
+                nn.BatchNorm2d(oup),
+                nn.ReLU6(inplace=True)
+            )
+
+        class ResidualDepthwiseSeparable(nn.Module):
+            '''带残差连接的深度可分离卷积块'''
+
+            def __init__(self, inp, oup, stride):
+                super(ResidualDepthwiseSeparable, self).__init__()
+                self.stride = stride
+                self.use_res_connect = stride == 1 and inp == oup
+
+                self.depthwise = nn.Sequential(
+                    nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
+                    nn.BatchNorm2d(inp),
+                    nn.ReLU6(inplace=True)
+                )
+
+                self.pointwise = nn.Sequential(
+                    nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+                    nn.BatchNorm2d(oup),
+                    nn.ReLU6(inplace=True)
+                )
+
+            def forward(self, x):
+                if self.use_res_connect:
+                    identity = x
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x + identity  # 残差连接
+                else:
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x
+
+        # 根据宽度乘数调整通道数
+        output_channels = int(32 * width_multiplier)
+        self.initial_conv = conv_bn(in_channels, output_channels, 2)
+
+        # 构建带残差连接的深度可分离卷积层
+        self.layers = nn.ModuleList([
+            ResidualDepthwiseSeparable(output_channels, int(64*width_multiplier), 1),
+            ResidualDepthwiseSeparable(int(64*width_multiplier), int(128*width_multiplier), 2),
+            ResidualDepthwiseSeparable(int(128*width_multiplier), int(128*width_multiplier), 1),
+
+            ResidualDepthwiseSeparable(int(128*width_multiplier), int(256*width_multiplier), 2),
+            ResidualDepthwiseSeparable(int(256*width_multiplier), int(256*width_multiplier), 1),
+
+            ResidualDepthwiseSeparable(int(256*width_multiplier), int(512*width_multiplier), 2),
+            ResidualDepthwiseSeparable(int(512*width_multiplier), int(512*width_multiplier), 1),
+
+            ResidualDepthwiseSeparable(int(512*width_multiplier), int(1024*width_multiplier), 2),
+        ])
+
+        # 全局平均池化层：将特征图压缩为1x1
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # 展平层：将多维特征转换为一维向量
+        self.flatten = nn.Flatten()
+        # 全连接层：将特征映射到512维特征空间
+        self.fc = nn.Linear(int(1024*width_multiplier), 8)
+
+    def forward(self, x):
+        x = self.initial_conv(x)
+        for layer in self.layers:
+            x = layer(x)
+        x = self.avg_pool(x)
+        x = self.flatten(x)
+        x = F.normalize(self.fc(x), p=2.0, dim=1)  # L2 正则化
+        return x
+
+
+class LightNet_opt(nn.Module):
+    """轻量残差 MobileNetV1 特征提取器"""
+    def __init__(self, in_channels, width_multiplier=1.0):
+        super(LightNet_opt, self).__init__()
+        self.width_multiplier = width_multiplier
+
+        def conv_bn(inp, oup, stride):
+            '''标准卷积块：卷积 + 批归一化 + ReLU'''
+            return nn.Sequential(
+                nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
+                nn.BatchNorm2d(oup),
+                nn.ReLU6(inplace=True)
+            )
+
+        class ResidualDepthwiseSeparable(nn.Module):
+            '''带残差连接的深度可分离卷积块'''
+
+            def __init__(self, inp, oup, stride):
+                super(ResidualDepthwiseSeparable, self).__init__()
+                self.stride = stride
+                self.use_res_connect = stride == 1 and inp == oup
+
+                self.depthwise = nn.Sequential(
+                    nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
+                    nn.BatchNorm2d(inp),
+                    nn.ReLU6(inplace=True)
+                )
+
+                self.pointwise = nn.Sequential(
+                    nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+                    nn.BatchNorm2d(oup),
+                    nn.ReLU6(inplace=True)
+                )
+
+            def forward(self, x):
+                if self.use_res_connect:
+                    identity = x
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x + identity  # 残差连接
+                else:
+                    x = self.depthwise(x)
+                    x = self.pointwise(x)
+                    return x
+
+        # 根据宽度乘数调整通道数
+        output_channels = int(32 * width_multiplier)
+        self.initial_conv = conv_bn(in_channels, output_channels, 2)
+
+        # 构建带残差连接的深度可分离卷积层
+        self.layers = nn.ModuleList([
+            ResidualDepthwiseSeparable(output_channels, int(4), 1),
+            ResidualDepthwiseSeparable(int(4), int(8), 2),
+            ResidualDepthwiseSeparable(int(8), int(8), 1),
+            ResidualDepthwiseSeparable(int(8), int(16), 2),
+            ResidualDepthwiseSeparable(int(16), int(16), 1),
+            ResidualDepthwiseSeparable(int(16), int(20), 2),
+            ResidualDepthwiseSeparable(int(20), int(20), 1),
+            ResidualDepthwiseSeparable(int(20), int(20), 1),
+            ResidualDepthwiseSeparable(int(20), int(20), 1),
+            ResidualDepthwiseSeparable(int(20), int(20), 1),
+            ResidualDepthwiseSeparable(int(20), int(20), 1),
+            ResidualDepthwiseSeparable(int(20), int(32), 2),
+            ResidualDepthwiseSeparable(int(32), int(32), 1),
+        ])
+
+        # 全局平均池化层：将特征图压缩为1x1
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # 展平层：将多维特征转换为一维向量
+        self.flatten = nn.Flatten()
+        # 全连接层：将特征映射到512维特征空间
+        self.fc = nn.Linear(int(32), 8)
+
+    def forward(self, x):
+        x = self.initial_conv(x)
+        for layer in self.layers:
+            x = layer(x)
+        x = self.avg_pool(x)
+        x = self.flatten(x)
+        x = F.normalize(self.fc(x), p=2.0, dim=1)  # L2 正则化
+        return x
+
+
+def MobileNet(version, in_channels, width_multiplier=1.0):
     """返回 MobileNet 对象"""
 
     if version == 'v1':
@@ -266,3 +431,7 @@ def mobilenet(version, in_channels, width_multiplier=1.0):
         return MobileNetV2(in_channels, width_multiplier)
     if version == 'light':
         return LightNet(in_channels, width_multiplier)
+    if version == 'light_prune':
+        return LightNet_prune(in_channels, width_multiplier)
+    if version == 'light_opt':
+        return LightNet_opt(in_channels, width_multiplier)
