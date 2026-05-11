@@ -1,12 +1,13 @@
 """配置管理模块"""
+import json
 import os
 import random
-import json
+from enum import Enum
 
 import numpy as np
 import torch
-from enum import Enum
 
+from net import NetworkType
 from paths import get_experiment_dir, generate_experiment_name
 
 # 设备配置
@@ -24,28 +25,10 @@ class Mode(str, Enum):
     LATENCY_BENCHMARK = "benchmark"   # 延迟基准测试模式 - 用于评估模型推理速度
 
 
-class DistillateMode(Enum):
-    """蒸馏训练模式枚举"""
-    ALL = 0              # 执行所有步骤
-    ONLY_DISTILLATE = 1  # 仅执行蒸馏
-    ONLY_TEST = 2        # 仅执行测试
-    ONLY_ROGUE = 3       # 仅执行恶意设备检测
-
-
-# 定义网络类型枚举
-class NetworkType(str, Enum):
-    """网络类型枚举"""
-    ResNet= "ResNet"               # 残差网络
-    DRSN = "Drsn"                   # 深度残差网路
-    MobileNetV1 = "MobileNetV1"     # MobileNetV1网络
-    MobileNetV2 = "MobileNetV2"     # MobileNetV2网络
-    LightNet = "LightNet"           # MobileNetV1改进网络
-
-
 # 定义预处理类型枚举
 class PreprocessType(Enum):
     """预处理类型枚举"""
-    IQ = ("IQ", 2)      # IQ数据直接使用，2个通道（I和Q）
+    IQ = ("IQ", 1)      # IQ数据直接使用，2个通道（I和Q）
     STFT = ("STFT", 1)  # 短时傅里叶变换，1个通道（幅度）
     WST = ("WST", 2)    # 小波散射变换，2个通道（实部和虚部）
 
@@ -58,7 +41,7 @@ class PreprocessType(Enum):
 class Config:
     def __init__(self,
         mode: Mode,
-        net_type: NetworkType | None = None,
+        net_type: str,
         **kwargs
     ):
         # 设置模式
@@ -74,7 +57,7 @@ class Config:
         self.new_file_flag = kwargs.get('new_file_flag', True)
 
         # CHECKPOINT列表
-        self.TEST_LIST = kwargs.get('test_list', [1, 5, 10, 20, 50, 100, 150, 200, 250, 300])
+        self.TEST_LIST = kwargs.get('test_list', [1, 5, 10, 20, 35, 50, 60, 70, 85, 100, 150, 200, 250, 300])
 
         # WST参数
         if self.PREPROCESS_TYPE == PreprocessType.WST:
@@ -85,8 +68,8 @@ class Config:
             self.WST_Q = None
 
         # PCA相关的配置
-        self.PCA_DIM_TRAIN = 16  # 训练时PCA的维度
-        self.PCA_DIM_TEST = 16  # 测试时PCA的维度
+        self.PCA_DIM_TRAIN = 8  # 训练时PCA的维度
+        self.PCA_DIM_TEST = 8  # 测试时PCA的维度
 
         # 超参数
         self.HP = {
@@ -94,7 +77,7 @@ class Config:
             "num_epochs": kwargs.get('num_epochs', max(self.TEST_LIST)),
             "learning_rate": kwargs.get('learning_rate', 1e-3),
             "temperature": kwargs.get('temperature', 3.0),  # 蒸馏温度参数
-            "alpha": kwargs.get('alpha', 0.7),  # 蒸馏损失权重参数
+            "alpha": kwargs.get('alpha', 1.0),  # 蒸馏损失权重参数
             "patience": kwargs.get('patience', 20),  # 早停耐心值
             "triplet_margin": kwargs.get('margin', 1.0),  # 三元组损失 Margin
             "benchmark_runs": kwargs.get('benchmark_runs', 10),  # 基准测试运行次数
@@ -106,20 +89,28 @@ class Config:
         # 基础版本号 (可选，用于继承关系)
         self.BASE_VERSION = kwargs.get('base_version', None)  # 如 "01", "02"
 
-        # 获取基础模型路径
+        # 获取基础模型信息
         if 'base_model_dir' in kwargs:
             self.BASE_MODEL_DIR = kwargs['base_model_dir']
         elif self.BASE_VERSION:
             # 如果未直接提供 base_model 但指定了 BASE_VERSION，则自动查找对应目录
-            exp_prefix = f"EXP_{self.BASE_VERSION}"
-            parent_dir = get_experiment_dir(None)
-            # 在父目录下查找以 EXP_{BASE_VERSION} 开头的目录
-            matching_dirs = [d for d in os.listdir(parent_dir) if d.startswith(exp_prefix) and os.path.isdir(os.path.join(parent_dir, d))]
-            if matching_dirs:
-                # 取第一个匹配项（可按需调整排序逻辑，例如按时间排序）
-                self.BASE_MODEL_DIR = os.path.join(parent_dir, matching_dirs[0])
-            else:
-                self.BASE_MODEL_DIR = None
+            def _find_base_model_dir(version: str) -> str | None:
+                """根据版本号自动查找基础模型目录"""
+                exp_prefix = f"EXP_{version}"
+                parent_dir = get_experiment_dir(None)
+                if not os.path.exists(parent_dir):
+                    return None
+                # 在父目录下查找以 EXP_{BASE_VERSION} 开头的目录
+                matching_dirs = [
+                    d for d in os.listdir(parent_dir) 
+                    if d.startswith(exp_prefix) and os.path.isdir(os.path.join(parent_dir, d))
+                ]
+                if matching_dirs:
+                    # 取第一个匹配项（可按需调整排序逻辑，例如按时间排序）
+                    return os.path.join(parent_dir, matching_dirs[0])
+                return None
+            # 基础模型目录
+            self.BASE_MODEL_DIR = _find_base_model_dir(self.BASE_VERSION)
         else:
             self.BASE_MODEL_DIR = None
         # 从 BASE_MODEL_DIR 解析基础网络类型 (例如从 ".../EXP_02_ResNet_Base" 中提取 "ResNet")
@@ -161,7 +152,7 @@ class Config:
         self.MODEL_DIR, self.MODEL_WEIGHTS_DIR, self.MODEL_EVAL_DIR = get_experiment_dir(self.EXP_NAME)
 
         # 新生成数据集文件路径
-        if self.PREPROCESS_TYPE == PreprocessType.STFT:
+        if self.PREPROCESS_TYPE == PreprocessType.STFT or PreprocessType.IQ:
             self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}.h5"
         elif self.PREPROCESS_TYPE == PreprocessType.WST:
             self.filename_train_prepared_data = f"train_data_{self.PREPROCESS_TYPE.value}_j{self.WST_J}q{self.WST_Q}.h5"
@@ -196,19 +187,31 @@ class Config:
             os.makedirs(directory, exist_ok=True)
 
     def to_dict(self):
-        """将所有配置转换为可JSON序列化的字典"""
-        data = {}
-        for key, value in self.__dict__.items():
-            # 处理枚举类型
-            if isinstance(value, Enum):
-                data[key] = value.name  # 存储枚举名称，如 "TRAIN"
-            # 处理 Path 对象 (如果有的话)
-            elif hasattr(value, '__fspath__'):
-                data[key] = str(value)
-            # 处理基本类型
-            elif isinstance(value, (list, dict, str, int, float, bool, type(None))):
-                data[key] = value
-        return data
+        """递归地将所有配置转换为可JSON序列化的字典"""
+
+        def _serialize(obj):
+            # 1. 处理 NumPy 类型 (数组和标量)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer, np.floating)):
+                return obj.item()
+            # 2. 处理枚举类型
+            if isinstance(obj, Enum):
+                return obj.name
+            # 3. 处理字典 (递归处理内容)
+            if isinstance(obj, dict):
+                return {k: _serialize(v) for k, v in obj.items()}
+            # 4. 处理列表/元组
+            if isinstance(obj, (list, tuple)):
+                return [_serialize(i) for i in obj]
+            # 5. 处理 Path 或其他有路径属性的对象
+            if hasattr(obj, '__fspath__'):
+                return str(obj)
+            # 6. 基本类型直接返回
+            return obj
+
+        # 遍历实例的所有属性并序列化
+        return {k: _serialize(v) for k, v in self.__dict__.items()}
 
     def save_to_json(self):
         """保存配置到实验目录"""
@@ -232,11 +235,10 @@ class Config:
         kwargs = {}
         if 'PREPROCESS_TYPE' in data:
             kwargs['preprocess_type'] = PreprocessType[data['PREPROCESS_TYPE']]
-        if 'DISTILLATE_MODE' in data:
-            kwargs['distillate_mode'] = DistillateMode[data['DISTILLATE_MODE']]
 
         # 网络类型
-        net_type = NetworkType[data['NET_TYPE']] if 'NET_TYPE' in data else None
+        if 'NET_TYPE' in data:
+            net_type = NetworkType[data['NET_TYPE']]
 
         # 描述和版本，确保重新构造时路径一致
         kwargs['test_list'] = data.get('TEST_LIST', [1, 5, 10, 20, 50, 100, 150, 200, 250, 300])

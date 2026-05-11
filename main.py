@@ -2,8 +2,9 @@
 import os
 import numpy as np
 
-from core.config import set_seed, Config, Mode, DEVICE, NetworkType, PreprocessType
+from core.config import set_seed, Config, Mode, DEVICE, PreprocessType
 from core.controller import main
+from net import NetworkType
 
 
 if __name__ == "__main__":
@@ -15,7 +16,7 @@ if __name__ == "__main__":
 
     # ==================== 配置选择开关 ====================
     # 修改此变量来选择不同的实验配置
-    EXP_SELECT = 1
+    EXP_SELECT = 5
     EXP_resume = False
     EXP_id = None
 
@@ -24,8 +25,8 @@ if __name__ == "__main__":
         # --- 示例 1: 训练基础模型 (EXP_01) ---
         config = Config(
             mode=Mode.TRAIN,
-            net_type=NetworkType.CV_LightNet,
-            preprocess_type=PreprocessType.IQ,
+            net_type=NetworkType.ShuffleNet,
+            preprocess_type=PreprocessType.STFT,
             learning_rate=1e-4,
             batch_size=32,
             exp_description="Base",
@@ -46,11 +47,11 @@ if __name__ == "__main__":
         # --- 示例 3: 知识蒸馏实验 (EXP_03) ---
         config = Config(
             mode=Mode.DISTILLATION,
-            net_type=NetworkType.CV_LightNet,
-            preprocess_type=PreprocessType.IQ,
-            exp_description="KD_PCA16",
-            base_version="02",  # 基于 EXP_02
-            snr=np.arange(20, 80),
+            net_type=NetworkType.ShuffleNet_prune,
+            preprocess_type=PreprocessType.STFT,
+            exp_description="KD_PCA8",
+            base_version="24",  # 基于 EXP_02
+            # snr=np.arange(20, 80),
             is_pca_train=True,
         )
         config.save_to_json()
@@ -68,10 +69,17 @@ if __name__ == "__main__":
         # --- 示例 5: 多分类实验 (EXP_01) ---
         config = Config.from_json(
             mode=Mode.MULTI_CLASSIFICATION,
-            model_dir="./checkpoints/EXP_02_ResNet_Base"
+            model_dir="./checkpoints/EXP_24_ShuffleNet_Base"
         )
         EXP_resume = True
-        EXP_id = "pwqr0un0fkph9ce2zz9t6"
+        EXP_id = "dr9l190g4h54u9xonjkqg"
+
+    elif EXP_SELECT == 6:
+        # --- 示例 6: 分类实验 (EXP_01) ---
+        config = Config.from_json(
+            mode=Mode.CLASSIFICATION,
+            model_dir="./checkpoints/EXP_17_ResNet_prune_v02_KD_PCA8"
+        )
 
     else:
         raise ValueError(f"未找到 EXPERIMENT_SELECT = {EXP_SELECT} 对应的配置")
