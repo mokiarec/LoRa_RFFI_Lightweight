@@ -17,6 +17,8 @@ class NetworkType(str, Enum):
     DenseNet_prune = "DenseNet_prune"
     ShuffleNet = "ShuffleNet"
     ShuffleNet_prune = "ShuffleNet_prune"
+    GoogleNet = "GoogleNet"
+    GoogleNet_prune = "GoogleNet_prune"
 
 
 # TripletNet类，用于创建三元组网络
@@ -199,3 +201,16 @@ def create_shufflenet_prune(in_channels: int, **kwargs):
     """创建剪枝版 ShuffleNet 网络"""
     from net.net_ShuffleNet import ShuffleNetV2_prune
     return ShuffleNetV2_prune(in_channels=in_channels)
+
+@Network.register(NetworkType.GoogleNet.value)
+def create_googlenet(in_channels: int, **kwargs):
+    """创建 GoogleNet 网络"""
+    from net.net_GoogleNet import GoogleNet
+    return GoogleNet(in_channels=in_channels)
+
+
+@Network.register(NetworkType.GoogleNet_prune.value)
+def create_googlenet_prune(in_channels: int, **kwargs):
+    """创建剪枝版 GoogleNet 网络"""
+    from net.net_GoogleNet import GoogleNet_prune
+    return GoogleNet_prune(in_channels=in_channels)

@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     # ==================== 配置选择开关 ====================
     # 修改此变量来选择不同的实验配置
-    EXP_SELECT = 3
+    EXP_SELECT = 5
     EXP_resume = False
     EXP_id = None
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         # --- 示例 1: 训练基础模型 (EXP_01) ---
         config = Config(
             mode=Mode.TRAIN,
-            net_type=NetworkType.ShuffleNet,
+            net_type=NetworkType.GoogleNet,
             preprocess_type=PreprocessType.STFT,
             learning_rate=1e-4,
             batch_size=32,
@@ -47,10 +47,10 @@ if __name__ == "__main__":
         # --- 示例 3: 知识蒸馏实验 (EXP_03) ---
         config = Config(
             mode=Mode.DISTILLATION,
-            net_type=NetworkType.ShuffleNet_prune,
+            net_type=NetworkType.GoogleNet_prune,
             preprocess_type=PreprocessType.STFT,
             exp_description="KD_PCA8",
-            base_version=24,  # 基于 EXP_02
+            base_version=26,  # 基于 EXP_02
             # snr=np.arange(20, 80),
             is_pca_train=True,
         )
@@ -69,10 +69,10 @@ if __name__ == "__main__":
         # --- 示例 5: 多分类实验 (EXP_01) ---
         config = Config.from_json(
             mode=Mode.MULTI_CLASSIFICATION,
-            model_dir="./checkpoints/EXP_24_ShuffleNet_Base"
+            model_dir="./checkpoints/EXP_27_GoogleNet_prune_v26_KD_PCA8"
         )
         EXP_resume = True
-        EXP_id = "dr9l190g4h54u9xonjkqg"
+        EXP_id = "1vo3u147zot8ybi05bd2u"
 
     elif EXP_SELECT == 6:
         # --- 示例 6: 分类实验 (EXP_01) ---

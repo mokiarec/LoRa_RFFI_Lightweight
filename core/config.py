@@ -3,6 +3,7 @@ import json
 import os
 import random
 from enum import Enum
+from pathlib import Path
 from typing import Optional, List
 
 import numpy as np
@@ -16,7 +17,7 @@ from paths import PathManager, ExperimentInfo
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 是否禁用 SwanLab
-DISABLE_SWANLAB = os.getenv("DISABLE_SWANLAB", "true").lower() in ("true", "1", "yes")
+DISABLE_SWANLAB = os.getenv("DISABLE_SWANLAB", "false").lower() in ("true", "1", "yes")
 
 
 # 配置类，用于存储全局配置参数
@@ -61,9 +62,16 @@ class Config:
 
         # 路径管理类实例化
         self.path_manager = PathManager()
-        # 获取实验信息类实例化
-        self.info = self.path_manager.create_experiment(self.net_type, self.exp_description,
-                                                        base_exp_num=self.base_version)
+        
+        # 检查是否提供了 exp_name，如果有则复用已有实验
+        exp_name = kwargs.get('exp_name', None)
+        if exp_name:
+            # 从已有实验名称恢复 ExperimentInfo
+            self.info = ExperimentInfo.from_name(exp_name)
+        else:
+            # 创建新实验
+            self.info = self.path_manager.create_experiment(self.net_type, self.exp_description,
+                                                            base_exp_num=self.base_version)
         # 处理父实验
         if self.info.is_extension:
             self.base_info = ExperimentInfo.from_name(self.path_manager.find_base_exp_path(self.info).name)
@@ -161,21 +169,20 @@ class Config:
 
         # 准备解包参数
         kwargs = {}
-        if 'PREPROCESS_TYPE' in data:
-            kwargs['preprocess_type'] = PreprocessType[data['PREPROCESS_TYPE']]
+        if 'preprocess_type' in data:
+            kwargs['preprocess_type'] = PreprocessType[data['preprocess_type']]
 
         # 网络类型
-        if 'NET_TYPE' in data:
-            net_type = NetworkType[data['NET_TYPE']]
+        if 'net_type' in data:
+            net_type = NetworkType[data['net_type']]
 
         # 描述和版本，确保重新构造时路径一致
-        kwargs['test_list'] = data.get('TEST_LIST', [1, 5, 10, 20, 50, 100, 150, 200, 250, 300])
-        kwargs['model_dir'] = data.get('MODEL_DIR', model_dir)
-        kwargs['exp_name'] = data.get('EXP_NAME', None)
-        kwargs['exp_description'] = data.get('EXP_DESCRIPTION', 'Base')
-        kwargs['base_version'] = data.get('BASE_VERSION', None)
-        kwargs['is_pca_train'] = data.get('IS_PCA_TRAIN', True)
-        kwargs['is_pca_test'] = data.get('IS_PCA_TEST', True)
+        kwargs['test_list'] = data.get('test_list', [1, 5, 10, 20, 50, 100, 150, 200, 250, 300])
+        kwargs['exp_description'] = data.get('exp_description', 'Base')
+        kwargs['base_version'] = data.get('base_version', None)
+        kwargs['is_pca_train'] = data.get('is_pca_train', True)
+        kwargs['is_pca_test'] = data.get('is_pca_test', True)
+        kwargs['exp_name'] = Path(model_dir).name
 
         # 重新初始化对象
         return cls(mode=mode, net_type=net_type, **kwargs)

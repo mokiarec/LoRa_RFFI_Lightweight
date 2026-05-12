@@ -46,6 +46,6 @@ def test_multi_clf(
             pkt_range_enrol=pkt_range_enrol,
             dev_range_clf=dev_range,
             pkt_range_clf=pkt_range,
-            is_pac=config.IS_PCA_TEST,
+            is_pac=config.is_pca_test,
             enable_plots=False,
         )
