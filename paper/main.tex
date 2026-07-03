@@ -54,7 +54,7 @@ Principal component analysis is then applied to the output feature maps of every
 A compact student network is constructed by replacing each layer's channel count with its PCA-derived effective dimension, with weights fully randomly reinitialized.
 Self-distillation transfers the teacher's knowledge to the student via temperature-scaled KL divergence in a shared PCA-aligned low-dimensional subspace.
 An optional iterative mode chains successive rounds of diagnosis, pruning, and distillation for accuracy-bounded progressive compression.
-Experiments across five diverse architectures on a real-world LoRa dataset demonstrate 14--206$\times$ parameter compression with minimal accuracy degradation, and show that self-distillation can even purify representations when the teacher is undertrained, with the student consistently outperforming its teacher.
+Experiments across five diverse architectures on a real-world LoRa dataset demonstrate 14--834$\times$ parameter compression with minimal accuracy degradation, and show that self-distillation can even purify representations when the teacher is undertrained, with the student consistently outperforming its teacher.
 \end{abstract}
 
 
@@ -86,7 +86,7 @@ The main contributions are summarized as follows.
     The randomly-initialized compact network is trained solely from teacher soft labels through temperature-scaled KL divergence in a shared PCA subspace. A PCA projection aligns the teacher's high-dimensional embedding with the student's low-dimensional output, enabling direct distribution matching. We further show that distillation acts as a representation purifier: even when the teacher is undertrained, the student can outperform it by learning from the PCA-filtered soft labels.
 
     \item \textbf{Iterative Compression with Accuracy Guarantee.}
-    An iterative mode chains successive rounds of PCA diagnosis, pruning, and distillation, achieving progressive compression until the accuracy drop exceeds a configurable threshold. We demonstrate convergence behavior across three rounds on ResNet, compressing 14.7$\times$ at 1.7\% accuracy loss and reaching an ultimate floor at 60.5$\times$ cumulative compression.
+    An iterative mode chains successive rounds of PCA diagnosis, pruning, and distillation, achieving progressive compression until the accuracy drop exceeds a configurable threshold. We demonstrate convergence behavior across three rounds on ResNet, compressing 14.7$\times$ with improved accuracy and reaching 67.2$\times$ cumulative compression after two rounds.
 \end{itemize}
 
 \section{Overview of an RF Fingerprinting System}
@@ -310,14 +310,14 @@ The student model occupies only 43.28~KB of storage, making it suitable for depl
 
 The remaining three architectures reveal a consistently recurring phenomenon: the distilled student outperforms its own teacher across a majority of test scenarios, often by substantial margins, despite operating at a fraction of the parameter budget.
 The SCSKNet student reduces parameters by 42.6$\times$ (210.67K to 4.95K) yet achieves higher accuracy on the NLOS F channel (99.9\% tie) and on Mobile Meeting (95.0\% vs.\ 92.2\%).
-The ShuffleNet student, at 42.74K parameters (41.6$\times$ compression), exceeds the teacher on 8 of the 11 evaluated scenarios, with the most pronounced gains on LOS B (93.1\% vs.\ 82.4\%, $+$10.7\%) and Walk B (94.8\% vs.\ 86.4\%, $+$8.4\%).
-The DenseNet student achieves the most dramatic compression---from 7,472.38K to 8.96K parameters (834$\times$) and from 366.07M to 1.60M FLOPs (228.8$\times$)---while outperforming the teacher on 11 of the 11 scenarios, including NLOS D (92.2\% vs.\ 90.2\%) and Mobile Meeting (98.5\% vs.\ 93.2\%).
+The ShuffleNet student, at 42.74K parameters (41.6$\times$ compression), exceeds the teacher on 8 of the 12 evaluated scenarios, with the most pronounced gains on LOS B (93.1\% vs.\ 82.4\%, $+$10.7\%) and Walk B (94.8\% vs.\ 86.4\%, $+$8.4\%).
+The DenseNet student achieves the most dramatic compression---from 7,472.38K to 8.96K parameters (834$\times$) and from 366.07M to 1.60M FLOPs (228.8$\times$)---while outperforming the teacher on 11 of the 12 scenarios, including NLOS D (92.2\% vs.\ 90.2\%) and Mobile Meeting (98.5\% vs.\ 93.2\%).
 
 The empirical superiority of the student over its teacher stems from a dual purification mechanism. First, although the teacher networks—trained under severe SNR augmentations or early termination—exhibit non-trivial manifest noise under direct KNN evaluation, they still encode underlying structural inter-device similarities. Second, the PCA projection onto the $d_s$-dimensional subspace acts as an analytical filter, systematically discarding perturbation-dominated dimensions while isolating the dominant variance directions. By optimizing against these structurally filtered soft labels, the student network successfully bypasses the teacher's original empirical noise, yielding a more robust and purified representation.
 
 \subsection{Iterative Distillation and Progressive Compression}
 
-Fig.~\ref{fig:iterative} and Table~\ref{tab:iterative_trace} present the iterative distillation trajectory for ResNet across early rounds. Round 1 reduces parameters from 203.3K to 13.8K ($14.7\times$) while yielding even better generalization, with accuracy boosting to 84.55\% in NLOS-E. Round 2 further compresses the network to 3.0K parameters ($67.2\times$), maintaining acceptable performance (e.g., 97.05\% in NLOS-D) within the threshold $\delta = 20\%$. Though Round 3 approaches the information-theoretic minimum with 1.4K parameters, it still sustains a reasonable 92.70\% accuracy in NLOS-D, before the structural capacity completely collapses in Round 4.
+Fig.~\ref{fig:iterative} and Table~\ref{tab:iterative_trace} present the iterative distillation trajectory for ResNet across early rounds. Round 1 reduces parameters from 203.3K to 13.8K ($14.7\times$) while yielding even better generalization, with accuracy boosting to 84.6\% in NLOS-E. Round 2 further compresses the network to 3.0K parameters ($67.2\times$), maintaining acceptable performance (e.g., 97.05\% in NLOS-D) within the threshold $\delta = 20\%$. Though Round 3 approaches the information-theoretic minimum with 1.4K parameters, it still sustains a reasonable 92.70\% accuracy in NLOS-D, before the structural capacity completely collapses in Round 4.
 
 \begin{figure}[t]
     \centering
@@ -352,15 +352,14 @@ Round 3 & [5, 6, 3, 2, 2]       & 1,364   & 96.00 & 92.70  & 96.85 \\
 
 \subsection{Inference Latency on Edge Platforms}
 
-To evaluate the real-time capability of the PCA-derived student networks, we measure inference latency , decomposing end-to-end latency into feature extraction and classification.
+To evaluate the real-time capability of the PCA-derived student networks, we measure inference latency, decomposing end-to-end latency into feature extraction and classification.
 Results are reported in the rightmost columns of Table~\ref{tab:final_merged_complete}.
 
-On the Jetson Nano, the ResNet18 teacher backbone requires 64.84~ms for feature extraction alone, yielding only 15~FPS and making it unsuitable for real-time per-packet authentication.
-In contrast, the SCSKNet and ShuffleNet student backbones complete feature extraction in 4.75~ms, achieving 167~FPS on the same constrained hardware---a throughput that exceeds typical LoRa packet rates with substantial headroom.
-With PCA-reduced embedding dimensions accelerating the KNN classification stage, end-to-end latency drops to 6.00~ms.
+On the Jetson Nano, the ResNet18 teacher backbone requires 4.45~ms for feature extraction and 33.36~ms end-to-end (30~FPS), making it unsuitable for real-time per-packet authentication.
+In contrast, all student backbones complete feature extraction in under 1.2~ms, with end-to-end latency ranging from 0.69~ms (DenseNet) to 1.60~ms (ResNet18), corresponding to 625--990~FPS on the same constrained hardware---a throughput that exceeds typical LoRa packet rates by a wide margin.
 
-On the RTX~4090, the student backbones execute within 0.24--0.25~ms per inference.
-With PCA-accelerated classification, end-to-end throughput reaches 1,064~FPS for the SCSKNet and ShuffleNet students and 1,316~FPS for the DenseNet student.
+On the RTX~4090, the student backbones execute feature extraction within 16.7--49.7~$\mu$s per inference.
+With PCA-accelerated classification, end-to-end throughput reaches 10,800--17,000~FPS across all student networks.
 These results confirm that the proposed automated pipeline produces models that are not only parameter- and storage-efficient, but also latency-optimal for real-time edge RFFI deployment across heterogeneous hardware platforms.
 
 
@@ -370,7 +369,7 @@ This paper presents an automated lightweight RFFI pipeline that integrates PCA-d
 By deriving per-layer channel budgets from the PCA energy spectrum of trained networks, the pipeline eliminates manual architecture design and replaces heuristic width multipliers with a data-driven criterion.
 Self-distillation enables randomly-initialized compact networks to recover teacher-level discriminability, and we demonstrate that distillation additionally serves as a representation purification mechanism: students of undertrained teachers consistently outperform their teachers.
 An iterative extension provides accuracy-bounded progressive compression, naturally converging to the channel-level information-theoretic floor.
-Experiments across five diverse architectures on a real-world LoRa dataset demonstrate 14--206$\times$ parameter compression with minimal accuracy degradation, and edge deployment on an NVIDIA Jetson Nano achieves 173~FPS inference throughput.
+Experiments across five diverse architectures on a real-world LoRa dataset demonstrate 14--834$\times$ parameter compression with minimal accuracy degradation, and edge deployment on an NVIDIA Jetson Nano achieves over 600~FPS inference throughput.
 This work provides a practical, fully automated path toward deploying secure, low-latency RFFI systems on resource-constrained edge platforms without sacrificing performance.
 
 
