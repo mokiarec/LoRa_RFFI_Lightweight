@@ -304,14 +304,14 @@ Table~\ref{tab:final_merged_complete} reports the comprehensive evaluation of th
 
 The ResNet18 teacher--student pair represents the canonical case where the teacher is well-trained.
 The student reduces the parameter count from 203.26K to 8.50K (23.9$\times$ compression) and FLOPs from 268.12M to 13.04M (20.6$\times$ reduction), while maintaining competitive accuracy across all scenarios.
-On LOS channels A and C, the student achieves 95.0\% and 95.5\% respectively, closely tracking the teacher's 99.7\% and 99.8\%.
-Notably, the student surpasses the teacher on the NLOS E channel (81.1\% vs.\ 62.5\%) and on Walk B (93.5\% vs.\ 92.6\%), suggesting that the PCA-derived compact architecture is less prone to overfitting under channel degradation.
+On LOS channels A and C, the student achieves 99.8\% and 96.4\% respectively, closely tracking the teacher's 99.7\% and 99.8\%.
+Notably, the student surpasses the teacher on the NLOS E channel (84.6\% vs.\ 62.5\%) and on Walk B (99.9\% vs.\ 92.6\%), suggesting that the PCA-derived compact architecture is less prone to overfitting under channel degradation.
 The student model occupies only 43.28~KB of storage, making it suitable for deployment on the most memory-constrained edge devices.
 
 The remaining three architectures reveal a consistently recurring phenomenon: the distilled student outperforms its own teacher across a majority of test scenarios, often by substantial margins, despite operating at a fraction of the parameter budget.
 The SCSKNet student reduces parameters by 42.6$\times$ (210.67K to 4.95K) yet achieves higher accuracy on the NLOS F channel (99.9\% tie) and on Mobile Meeting (95.0\% vs.\ 92.2\%).
-The ShuffleNet student, at 42.74K parameters (41.6$\times$ compression), exceeds the teacher on 9 of the 11 evaluated scenarios, with the most pronounced gains on LOS B (93.1\% vs.\ 82.4\%, $+$10.7\%) and Walk B (94.8\% vs.\ 86.4\%, $+$8.4\%).
-The DenseNet student achieves the most dramatic compression---from 7,472.38K to 8.96K parameters (834$\times$) and from 366.07M to 1.60M FLOPs (228.8$\times$)---while outperforming the teacher on 10 of the 11 scenarios, including NLOS D (92.2\% vs.\ 90.2\%) and Mobile Meeting (98.5\% vs.\ 93.2\%).
+The ShuffleNet student, at 42.74K parameters (41.6$\times$ compression), exceeds the teacher on 8 of the 11 evaluated scenarios, with the most pronounced gains on LOS B (93.1\% vs.\ 82.4\%, $+$10.7\%) and Walk B (94.8\% vs.\ 86.4\%, $+$8.4\%).
+The DenseNet student achieves the most dramatic compression---from 7,472.38K to 8.96K parameters (834$\times$) and from 366.07M to 1.60M FLOPs (228.8$\times$)---while outperforming the teacher on 11 of the 11 scenarios, including NLOS D (92.2\% vs.\ 90.2\%) and Mobile Meeting (98.5\% vs.\ 93.2\%).
 
 The empirical superiority of the student over its teacher stems from a dual purification mechanism. First, although the teacher networks—trained under severe SNR augmentations or early termination—exhibit non-trivial manifest noise under direct KNN evaluation, they still encode underlying structural inter-device similarities. Second, the PCA projection onto the $d_s$-dimensional subspace acts as an analytical filter, systematically discarding perturbation-dominated dimensions while isolating the dominant variance directions. By optimizing against these structurally filtered soft labels, the student network successfully bypasses the teacher's original empirical noise, yielding a more robust and purified representation.
 
@@ -352,10 +352,16 @@ Round 3 & [5, 6, 3, 2, 2]       & 1,364   & 96.00 & 92.70  & 96.85 \\
 
 \subsection{Inference Latency on Edge Platforms}
 
-To evaluate real-time capability, we measure inference latency on the NVIDIA Jetson Nano (4~GB).
-The PCA-derived ResNet student completes feature extraction in \textbf{4.8~ms} per packet, compared to 64.8~ms for the original ResNet teacher---a 13.5$\times$ speedup.
-With PCA-based classification backend acceleration, end-to-end latency reaches 5.8~ms, corresponding to \textbf{173~FPS}.
-This throughput exceeds the requirements of typical LoRa packet rates by a wide margin, confirming that the automated pipeline produces not only parameter-efficient but also latency-efficient models suitable for real-time edge deployment.
+To evaluate the real-time capability of the PCA-derived student networks, we measure inference latency , decomposing end-to-end latency into feature extraction and classification.
+Results are reported in the rightmost columns of Table~\ref{tab:final_merged_complete}.
+
+On the Jetson Nano, the ResNet18 teacher backbone requires 64.84~ms for feature extraction alone, yielding only 15~FPS and making it unsuitable for real-time per-packet authentication.
+In contrast, the SCSKNet and ShuffleNet student backbones complete feature extraction in 4.75~ms, achieving 167~FPS on the same constrained hardware---a throughput that exceeds typical LoRa packet rates with substantial headroom.
+With PCA-reduced embedding dimensions accelerating the KNN classification stage, end-to-end latency drops to 6.00~ms.
+
+On the RTX~4090, the student backbones execute within 0.24--0.25~ms per inference.
+With PCA-accelerated classification, end-to-end throughput reaches 1,064~FPS for the SCSKNet and ShuffleNet students and 1,316~FPS for the DenseNet student.
+These results confirm that the proposed automated pipeline produces models that are not only parameter- and storage-efficient, but also latency-optimal for real-time edge RFFI deployment across heterogeneous hardware platforms.
 
 
 \section{Conclusion}
