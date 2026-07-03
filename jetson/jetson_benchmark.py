@@ -19,7 +19,7 @@ Jetson 端到端推理基准测试（完全自包含，无需项目依赖）
 目录结构:
     ./
     ├── jetson_benchmark.py    # 本文件
-    ├── jetson_models/         # 8 个 .pth 权重
+    ├── test_models/         # 8 个 .pth 权重
     │   ├── ResNet_teacher.pth
     │   ├── ResNet_student.pth
     │   ├── SCSKNet_teacher.pth
@@ -774,13 +774,13 @@ def benchmark_one_model(model, device, data_enrol, label_enrol, data_clf, label_
 def main():
     parser = argparse.ArgumentParser(description="Jetson RFFI Batch Benchmark (self-contained)")
 
-    parser.add_argument("--model-dir", type=str, default="./jetson_models")
+    parser.add_argument("--model-dir", type=str, default="./jetson/test_models")
     parser.add_argument("--enrol-data", type=str, required=True)
     parser.add_argument("--clf-data", type=str, required=True)
-    parser.add_argument("--enrol-dev", type=int, nargs=2, default=[0, 39])
-    parser.add_argument("--enrol-pkt", type=int, nargs=2, default=[0, 100])
-    parser.add_argument("--clf-dev", type=int, nargs=2, default=[0, 39])
-    parser.add_argument("--clf-pkt", type=int, nargs=2, default=[100, 200])
+    parser.add_argument("--enrol-dev", type=int, nargs=2, default=[30, 34])
+    parser.add_argument("--enrol-pkt", type=int, nargs=2, default=[0, 10])
+    parser.add_argument("--clf-dev", type=int, nargs=2, default=[30, 34])
+    parser.add_argument("--clf-pkt", type=int, nargs=2, default=[10, 20])
     parser.add_argument("--num-runs", type=int, default=30)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--pca-dim", type=int, default=8)

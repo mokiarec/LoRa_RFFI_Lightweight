@@ -109,7 +109,7 @@ def main():
     
     net_type = NetworkType.ResNet
     # model_path = "D:\\ScienceProject\\LoRa_RFFI\\checkpoints\\EXP_26_GoogleNet_Base\\weights\\Extractor_best.pth"
-    model_path = "./best.pth"
+    model_path = "best.pth"
     preprocess_type = PreprocessType.STFT
     
     # 从模型路径提取实验名称
