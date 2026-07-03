@@ -47,7 +47,7 @@ if __name__ == "__main__":
         # --- 示例 3: 知识蒸馏实验 (EXP_03) ---
         config = Config(
             mode=Mode.DISTILLATION,
-            net_type=NetworkType.GoogleNet_prune,
+            net_type=NetworkType.ResNet,
             preprocess_type=PreprocessType.STFT,
             exp_description="KD_PCA8",
             base_version=26,  # 基于 EXP_02
@@ -69,10 +69,10 @@ if __name__ == "__main__":
         # --- 示例 5: 多分类实验 (EXP_01) ---
         config = Config.from_json(
             mode=Mode.MULTI_CLASSIFICATION,
-            model_dir="./checkpoints/EXP_27_GoogleNet_prune_v26_KD_PCA8"
+            model_dir="./checkpoints/EXP_02_ResNet_Base"
         )
-        EXP_resume = True
-        EXP_id = "1vo3u147zot8ybi05bd2u"
+        EXP_resume = False
+        # EXP_id = "1vo3u147zot8ybi05bd2u"
 
     elif EXP_SELECT == 6:
         # --- 示例 6: 分类实验 (EXP_01) ---

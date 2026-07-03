@@ -17,7 +17,7 @@ from paths import PathManager, ExperimentInfo
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 是否禁用 SwanLab
-DISABLE_SWANLAB = os.getenv("DISABLE_SWANLAB", "false").lower() in ("true", "1", "yes")
+DISABLE_SWANLAB = os.getenv("DISABLE_SWANLAB", "true").lower() in ("true", "1", "yes")
 
 
 # 配置类，用于存储全局配置参数

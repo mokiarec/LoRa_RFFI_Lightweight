@@ -84,7 +84,7 @@ DATASET = {
             name="Residential Enrol",
             path=TEST_DATASET_DIR / "dataset_residential.h5",
             dev_range=np.arange(30, 40),
-            pkt_range=np.arange(4, 100),
+            pkt_range=np.arange(0, 100),
             note="Residential, LOS, stationary - 住宅环境注册数据"
         ),
 

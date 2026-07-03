@@ -225,7 +225,8 @@ def save_statistics_to_csv(all_stats, filename=None):
     import csv
 
     if filename is None:
-        filename = PathManager.get_paper_output_files()['model_statistics']
+        path = PathManager()
+        filename = path.get_paper_output_files()['model_statistics']
 
     with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['exp_name', 'net_type', 'preprocess_type', 'model_file', 'total_params', 'trainable_params',
